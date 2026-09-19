@@ -15,7 +15,6 @@
       --bg-gradient: linear-gradient(135deg, #f0f4f1 0%, #e2ece9 100%);
       --card-bg: #ffffff;
       --text: #1b4332;
-      --text-muted: #52796f;
       --orange: #f4a261;
       --danger: #e76f51;
     }
@@ -23,7 +22,7 @@
     * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; margin: 0; padding: 0; }
     body { background: var(--bg-gradient); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; user-select: none; }
 
-    /* 1. PANTALLA INICIO */
+    /* PANTALLA INICIO */
     #pantalla-inicio {
       display: flex; flex-direction: column; justify-content: center; align-items: center;
       height: 100vh; background: linear-gradient(135deg, #1b4332, #2d6a4f, #40916c); color: white; text-align: center; padding: 20px;
@@ -32,13 +31,13 @@
     #pantalla-inicio h1 { font-size: 2.4rem; margin-bottom: 8px; font-weight: 800; letter-spacing: -0.5px; }
     .badge-tasa-inicio { background: rgba(255,255,255,0.2); backdrop-filter: blur(8px); padding: 8px 20px; border-radius: 30px; font-size: 1rem; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.3); font-weight: 600; }
     .btn-comenzar {
-      padding: 18px 48px; font-size: 1.6rem; border: none; border-radius: 50px;
+      padding: 18px 55px; font-size: 1.6rem; border: none; border-radius: 50px;
       background: var(--orange); color: white; font-weight: 800; cursor: pointer;
       box-shadow: 0 10px 25px rgba(244,162,97,0.4); transition: transform 0.2s, background 0.2s;
     }
     .btn-comenzar:active { transform: scale(0.95); }
 
-    /* 2. HEADER */
+    /* HEADER */
     #pantalla-kiosco { display: none; flex-direction: column; height: 100vh; }
     
     header {
@@ -51,17 +50,18 @@
     .peso-display {
       font-size: 1.7rem; font-weight: 800; color: var(--primary); background: var(--accent);
       padding: 6px 22px; border-radius: 30px; border: 2px solid var(--primary-light); display: flex; align-items: center; gap: 8px;
-      box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); cursor: pointer;
     }
 
     .tasa-ticker { font-size: 0.85rem; background: #e9ecef; padding: 4px 12px; border-radius: 12px; font-weight: 700; color: #343a40; display: inline-block; margin-top: 2px; }
 
-    /* 3. VISTA DE CATEGORÍAS (CUADROS VOLANDOS) */
+    /* CUERPO */
     .contenedor-cuerpo { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; }
     
     .seccion-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
     .btn-volver-cat { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 12px; font-weight: 700; cursor: pointer; display: none; align-items: center; gap: 6px; }
 
+    /* CATEGORÍAS */
     .grid-categorias {
       display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 18px; width: 100%;
     }
@@ -74,7 +74,7 @@
     .card-categoria .icon-cat { font-size: 3.2rem; margin-bottom: 10px; }
     .card-categoria h3 { font-size: 1.2rem; color: var(--primary-dark); font-weight: 800; }
 
-    /* 4. GRID RESPONSIVA DE PRODUCTOS (ADAPTABLE) */
+    /* GRID DE PRODUCTOS */
     .grid-productos {
       display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; width: 100%;
     }
@@ -107,7 +107,7 @@
       justify-content: center; align-items: center; font-weight: 800; border: 2px solid white;
     }
 
-    /* MODALES & TICKET */
+    /* MODALES */
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 100; }
     .modal-contenido { background: white; padding: 25px; border-radius: 24px; width: 90%; max-width: 480px; box-shadow: 0 20px 40px rgba(0,0,0,0.25); max-height: 90vh; overflow-y: auto; }
     
@@ -124,10 +124,10 @@
   <!-- 1. PANTALLA INICIAL (BIENVENIDA) -->
   <div id="pantalla-inicio">
     <img id="img-logo-bienvenida" class="logo-bienvenida" src="https://cdn-icons-png.flaticon.com/512/1046/1046857.png" alt="Logo">
-    <h1>Autoservicio POS</h1>
+    <h1>Autoservicio & Báscula</h1>
     <div class="badge-tasa-inicio">💵 Tasa BCV Oficial: <b id="tasa-display-inicio">Cargando...</b> Bs/$</div>
-    <p style="font-size: 1.15rem; opacity: 0.95; margin-bottom: 25px;">Toque el botón para comenzar a pesar sus productos</p>
-    <button class="btn-comenzar" onclick="iniciarKiosco()">¡COMENZAR! / PÁCALA</button>
+    <p style="font-size: 1.15rem; opacity: 0.95; margin-bottom: 25px;">Coloque su producto sobre la balanza para empezar</p>
+    <button class="btn-comenzar" onclick="iniciarKiosco()">¡COMENZAR!</button>
   </div>
 
   <!-- 2. PANTALLA PRINCIPAL DE PRODUCTOS (KIOSCO) -->
@@ -140,7 +140,7 @@
           <div class="tasa-ticker">BCV: <span id="tasa-display-header">--.--</span> Bs/$</div>
         </div>
       </div>
-      <div class="peso-display">⚖️ <span id="peso-val">350</span> <small style="font-size:0.9rem;">g</small></div>
+      <div class="peso-display" onclick="simularOModificarPeso()" title="Toca para cambiar peso simulado">⚖️ <span id="peso-val">0</span> <small style="font-size:0.9rem;">g</small></div>
       <div style="display: flex; gap: 8px;">
         <button class="btn-admin-header" onclick="solicitarAccesoAdmin()">⚙️ Admin</button>
         <button class="btn-admin-header" style="background: var(--accent); color: var(--primary);" onclick="conectarBLE()">📡 BLE</button>
@@ -153,7 +153,7 @@
         <button class="btn-volver-cat" id="btn-volver" onclick="mostrarCategorias()">⬅️ Todas las Categorías</button>
       </div>
 
-      <!-- VISTA 1: CATEGORÍAS (CUADROS VOLANDO) -->
+      <!-- VISTA 1: CATEGORÍAS -->
       <div class="grid-categorias" id="vista-categorias">
         <div class="card-categoria" onclick="filtrarPorCategoria('Frutería')">
           <div class="icon-cat">🍎</div>
@@ -177,7 +177,7 @@
         </div>
       </div>
 
-      <!-- VISTA 2: GRID RESPONSIVA DE PRODUCTOS -->
+      <!-- VISTA 2: GRID DE PRODUCTOS -->
       <div class="grid-productos" id="vista-productos" style="display: none;">
         <!-- Generado dinámicamente -->
       </div>
@@ -190,7 +190,7 @@
     </button>
   </div>
 
-  <!-- MODAL DE CONFIRMACIÓN AL TOCAR UN PRODUCTO -->
+  <!-- MODAL DE CONFIRMACIÓN -->
   <div class="modal" id="modal-confirmar">
     <div class="modal-contenido" style="text-align: center;">
       <h2 id="modal-prod-nombre" style="color: var(--primary-dark); font-weight:800;">Producto</h2>
@@ -209,7 +209,7 @@
     </div>
   </div>
 
-  <!-- MODAL CARRITO / RESUMEN -->
+  <!-- MODAL CARRITO -->
   <div class="modal" id="modal-carrito">
     <div class="modal-contenido">
       <h2 style="color: var(--primary-dark); margin-bottom: 12px; font-weight:800;">Su Carrito de Compras</h2>
@@ -227,7 +227,7 @@
     </div>
   </div>
 
-  <!-- MODAL TICKET CON SERIE Y TASA BCV -->
+  <!-- MODAL TICKET -->
   <div class="modal" id="modal-ticket">
     <div class="modal-contenido" style="text-align: center;">
       <h2 style="color:var(--primary-dark); font-weight:800;">¡Ticket Generado!</h2>
@@ -241,7 +241,7 @@
     </div>
   </div>
 
-  <!-- MODAL ADMINISTRADOR (CONFIGURACIÓN) -->
+  <!-- MODAL ADMIN -->
   <div class="modal" id="modal-admin">
     <div class="modal-contenido">
       <h2 style="color:var(--primary-dark); margin-bottom:14px; font-weight:800;">Panel de Control Admin</h2>
@@ -263,7 +263,7 @@
         <button class="btn-action" onclick="actualizarLogo()" style="width:100%; background:#e2e8f0; color:#334155; padding:9px;">Cambiar Logo</button>
       </div>
 
-      <!-- AGREGAR PRODUCTO CON CATEGORÍA -->
+      <!-- AGREGAR PRODUCTO -->
       <div style="background:#f8fafc; padding:14px; border-radius:14px; margin-bottom:15px; border:1px solid #e2e8f0;">
         <h4 style="margin-bottom:8px; color:#1e293b;">🍎 Agregar Nuevo Producto</h4>
         <input type="text" id="adm-nombre" placeholder="Nombre (ej. Almendras, Queso Blanco)" style="width:100%; padding:9px; margin-bottom:6px; border-radius:10px; border:1px solid #cbd5e1;">
@@ -293,11 +293,11 @@
   </div>
 
   <script>
-    // --- PERSISTENCIA Y VARIABLES DE ESTADO ---
+    // PERSISTENCIA
     let tasaBCV = parseFloat(localStorage.getItem('bascula_tasa_bcv')) || 36.50;
     let claveAdmin = localStorage.getItem('bascula_clave_admin') || "1234";
     let logoUrl = localStorage.getItem('bascula_logo_url') || "https://cdn-icons-png.flaticon.com/512/1046/1046857.png";
-    let pesoActualGramos = 350; // Valor de prueba por defecto
+    let pesoActualGramos = 0; // Inicia en 0 gramos hasta conectar la báscula real o cambiarlo
     let carrito = [];
     let productoTemp = null;
     let categoriaSeleccionada = "";
@@ -314,10 +314,10 @@
 
     let productos = JSON.parse(localStorage.getItem('bascula_productos')) || productosPredeterminados;
 
-    // INICIALIZACIÓN
     window.addEventListener('DOMContentLoaded', () => {
       aplicarLogo();
       actualizarDisplaysTasa();
+      actualizarDisplayPeso();
       obtenerTasaBCVOnline();
     });
 
@@ -332,28 +332,35 @@
       document.getElementById('adm-tasa').value = tasaBCV.toFixed(2);
     }
 
-    // --- OBTENER TASA DÓLAR BCV ACTUALIZADA ---
-    async function obtenerTasaBCVOnline() {
-      const apis = [
-        "https://rates.dolarvzla.com/bcv/current.json",
-        "https://pydolarvenezuela-api.vercel.app/api/v1/dollar?page=bcv"
-      ];
+    function actualizarDisplayPeso() {
+      document.getElementById('peso-val').innerText = pesoActualGramos;
+    }
 
-      for (let url of apis) {
-        try {
-          let response = await fetch(url);
-          if (response.ok) {
-            let data = await response.json();
-            let valor = data?.price || data?.rate || data?.usd || data?.monitors?.usd?.price;
-            if (valor && !isNaN(valor) && parseFloat(valor) > 0) {
-              tasaBCV = parseFloat(valor);
-              guardarTasaEnStorage(tasaBCV);
-              return;
-            }
+    function simularOModificarPeso() {
+      let nuevo = prompt("Ingresa el peso en gramos para probar (ej. 500 para medio kilo):", pesoActualGramos);
+      if (nuevo !== null && !isNaN(nuevo)) {
+        pesoActualGramos = parseInt(nuevo);
+        actualizarDisplayPeso();
+      }
+    }
+
+    // --- CONSUMO DIRECTO API BCV ---
+    async function obtenerTasaBCVOnline() {
+      const url = "https://rates.dolarvzla.com/bcv/current.json";
+      try {
+        let response = await fetch(url);
+        if (response.ok) {
+          let data = await response.json();
+          // Extraer la tasa según los campos posibles de este JSON
+          let valor = data?.price || data?.rate || data?.usd || data?.current || data?.bcv || data?.dolar;
+          if (valor && !isNaN(valor) && parseFloat(valor) > 0) {
+            tasaBCV = parseFloat(valor);
+            guardarTasaEnStorage(tasaBCV);
+            return;
           }
-        } catch (e) {
-          console.log("Error intentando obtener tasa desde: " + url);
         }
+      } catch (e) {
+        console.log("No se pudo obtener la tasa en vivo, usando la almacenada.");
       }
     }
 
@@ -372,7 +379,7 @@
       }
     }
 
-    // --- FLUJO DE CATEGORÍAS Y PRODUCTOS ---
+    // --- FLUJO KIOSCO ---
     function iniciarKiosco() {
       document.getElementById('pantalla-inicio').style.display = 'none';
       document.getElementById('pantalla-kiosco').style.display = 'flex';
@@ -423,6 +430,9 @@
     }
 
     function seleccionarProducto(id) {
+      if (pesoActualGramos === 0) {
+        alert("Atención: El peso actual está en 0 g. Toca la balanza verde superior para colocar un peso de prueba o conectar el Bluetooth de la báscula.");
+      }
       productoTemp = productos.find(p => p.id === id);
       const subtotalUsd = (pesoActualGramos / 1000) * productoTemp.precioKg;
       const subtotalBs = subtotalUsd * tasaBCV;
@@ -554,7 +564,7 @@
       document.getElementById('pantalla-inicio').style.display = 'flex';
     }
 
-    // --- ADMINISTRACIÓN ---
+    // ADMINISTRACIÓN
     function solicitarAccesoAdmin() {
       const pass = prompt("Ingrese la contraseña de Administrador:");
       if (pass === claveAdmin) {
@@ -624,7 +634,7 @@
     }
   </script>
 
-  <!-- SERVICE WORKER FOR OFFLINE -->
+  <!-- SERVICE WORKER -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
