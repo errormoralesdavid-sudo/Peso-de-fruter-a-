@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#1b4332">
   <title>Kiosco Báscula POS PWA</title>
   <link rel="manifest" href="manifest.json">
+  <!-- Librería ligera para generar Código QR -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     :root {
       --primary: #2d6a4f;
@@ -16,106 +18,197 @@
       --card-bg: #ffffff;
       --text: #1b4332;
       --orange: #f4a261;
+      --orange-hover: #e76f51;
       --danger: #e76f51;
+      --shadow-sm: 0 4px 12px rgba(0,0,0,0.05);
+      --shadow-md: 0 8px 24px rgba(45,106,79,0.12);
+      --shadow-lg: 0 15px 35px rgba(0,0,0,0.18);
     }
 
     * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; margin: 0; padding: 0; }
     body { background: var(--bg-gradient); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; user-select: none; }
 
+    /* KEYFRAMES ANIMACIONES */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.85); }
+      70% { transform: scale(1.03); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 0 0 0 rgba(82, 183, 136, 0.5); }
+      70% { box-shadow: 0 0 0 14px rgba(82, 183, 136, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(82, 183, 136, 0); }
+    }
+
+    @keyframes bounceBadge {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.35); }
+    }
+
+    @keyframes floatHero {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-8px); }
+    }
+
     /* PANTALLA INICIO */
     #pantalla-inicio {
       display: flex; flex-direction: column; justify-content: center; align-items: center;
       height: 100vh; background: linear-gradient(135deg, #1b4332, #2d6a4f, #40916c); color: white; text-align: center; padding: 20px;
+      animation: fadeIn 0.5s ease-out;
     }
-    .logo-bienvenida { max-width: 130px; height: 130px; object-fit: contain; margin-bottom: 15px; border-radius: 24px; background: white; padding: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.25); }
+    .logo-bienvenida { 
+      max-width: 130px; height: 130px; object-fit: contain; margin-bottom: 15px; border-radius: 24px; 
+      background: white; padding: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.25); 
+      animation: floatHero 4s ease-in-out infinite;
+    }
     #pantalla-inicio h1 { font-size: 2.4rem; margin-bottom: 8px; font-weight: 800; letter-spacing: -0.5px; }
     .badge-tasa-inicio { background: rgba(255,255,255,0.2); backdrop-filter: blur(8px); padding: 8px 20px; border-radius: 30px; font-size: 1rem; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.3); font-weight: 600; }
+    
     .btn-comenzar {
       padding: 18px 55px; font-size: 1.6rem; border: none; border-radius: 50px;
-      background: var(--orange); color: white; font-weight: 800; cursor: pointer;
-      box-shadow: 0 10px 25px rgba(244,162,97,0.4); transition: transform 0.2s, background 0.2s;
+      background: linear-gradient(135deg, #f4a261, #e76f51); color: white; font-weight: 800; cursor: pointer;
+      box-shadow: 0 10px 25px rgba(244,162,97,0.4); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      animation: pulseGlow 2.5s infinite;
     }
-    .btn-comenzar:active { transform: scale(0.95); }
+    .btn-comenzar:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 15px 30px rgba(244,162,97,0.6); }
+    .btn-comenzar:active { transform: translateY(1px) scale(0.96); }
 
     /* HEADER */
-    #pantalla-kiosco { display: none; flex-direction: column; height: 100vh; }
+    #pantalla-kiosco { display: none; flex-direction: column; height: 100vh; animation: fadeIn 0.4s ease-out; }
     
     header {
-      background: white; padding: 12px 24px; display: flex; justify-content: space-between;
+      background: white; padding: 10px 20px; display: flex; justify-content: space-between;
       align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.06); border-bottom: 3px solid var(--accent); z-index: 10;
     }
-    .header-logo-container { display: flex; align-items: center; gap: 12px; }
-    .header-logo { height: 45px; width: auto; object-fit: contain; }
+    .header-logo-container { display: flex; align-items: center; gap: 10px; }
+    .header-logo { height: 40px; width: auto; object-fit: contain; }
     
+    .peso-box { display: flex; flex-direction: column; align-items: center; }
     .peso-display {
-      font-size: 1.7rem; font-weight: 800; color: var(--primary); background: var(--accent);
-      padding: 6px 22px; border-radius: 30px; border: 2px solid var(--primary-light); display: flex; align-items: center; gap: 8px;
-      box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); cursor: pointer;
+      font-size: 1.5rem; font-weight: 800; color: var(--primary); background: var(--accent);
+      padding: 4px 18px; border-radius: 30px; border: 2px solid var(--primary-light); display: flex; align-items: center; gap: 6px;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.2s;
     }
+    .peso-display:hover { transform: scale(1.04); }
+    .estado-peso { font-size: 0.72rem; font-weight: 700; color: #2b9348; margin-top: 2px; }
 
-    .tasa-ticker { font-size: 0.85rem; background: #e9ecef; padding: 4px 12px; border-radius: 12px; font-weight: 700; color: #343a40; display: inline-block; margin-top: 2px; }
+    .tasa-ticker { font-size: 0.82rem; background: #e9ecef; padding: 3px 10px; border-radius: 10px; font-weight: 700; color: #343a40; display: inline-block; margin-top: 2px; }
 
     /* CUERPO */
-    .contenedor-cuerpo { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; }
+    .contenedor-cuerpo { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; }
     
-    .seccion-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-    .btn-volver-cat { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 12px; font-weight: 700; cursor: pointer; display: none; align-items: center; gap: 6px; }
+    .seccion-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
+    .btn-volver-cat { background: var(--primary); color: white; border: none; padding: 8px 14px; border-radius: 12px; font-weight: 700; cursor: pointer; display: none; align-items: center; gap: 6px; transition: transform 0.2s; }
+    .btn-volver-cat:active { transform: scale(0.95); }
+
+    /* BUSCADOR */
+    .input-busqueda {
+      padding: 9px 16px; border-radius: 20px; border: 2px solid #cbd5e1; width: 100%; max-width: 280px; font-weight: 600; outline: none; transition: all 0.25s ease;
+    }
+    .input-busqueda:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(82, 183, 136, 0.2); }
 
     /* CATEGORÍAS */
     .grid-categorias {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 18px; width: 100%;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; width: 100%;
+      animation: fadeIn 0.4s ease-out;
     }
     .card-categoria {
-      background: white; border-radius: 20px; padding: 22px 15px; text-align: center;
-      box-shadow: 0 6px 16px rgba(0,0,0,0.05); cursor: pointer; border: 2px solid transparent;
-      transition: all 0.25s ease; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: white; border-radius: 20px; padding: 20px 12px; text-align: center;
+      box-shadow: var(--shadow-sm); cursor: pointer; border: 2px solid transparent;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); display: flex; flex-direction: column; align-items: center; justify-content: center;
     }
-    .card-categoria:hover, .card-categoria:active { transform: translateY(-5px); border-color: var(--primary-light); box-shadow: 0 10px 22px rgba(45,106,79,0.15); }
-    .card-categoria .icon-cat { font-size: 3.2rem; margin-bottom: 10px; }
-    .card-categoria h3 { font-size: 1.2rem; color: var(--primary-dark); font-weight: 800; }
+    .card-categoria:hover { transform: translateY(-6px); border-color: var(--primary-light); box-shadow: var(--shadow-md); }
+    .card-categoria:active { transform: translateY(-1px) scale(0.96); }
+    .card-categoria .icon-cat { font-size: 3rem; margin-bottom: 8px; transition: transform 0.3s; }
+    .card-categoria:hover .icon-cat { transform: scale(1.15) rotate(5deg); }
+    .card-categoria h3 { font-size: 1.15rem; color: var(--primary-dark); font-weight: 800; }
 
     /* GRID DE PRODUCTOS */
     .grid-productos {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; width: 100%;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; width: 100%;
+      animation: fadeIn 0.35s ease-out;
     }
     @media (min-width: 600px) {
-      .grid-productos { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }
-      .grid-categorias { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 22px; }
+      .grid-productos { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 18px; }
+      .grid-categorias { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }
     }
 
     .card-producto {
-      background: var(--card-bg); border-radius: 18px; padding: 14px; text-align: center;
-      box-shadow: 0 6px 15px rgba(0,0,0,0.04); cursor: pointer; border: 1px solid #e2e8f0;
-      transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+      background: var(--card-bg); border-radius: 18px; padding: 12px; text-align: center;
+      box-shadow: var(--shadow-sm); cursor: pointer; border: 1px solid #e2e8f0;
+      transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+      position: relative; overflow: hidden;
     }
-    .card-producto:hover { transform: translateY(-4px); border-color: var(--primary-light); box-shadow: 0 8px 20px rgba(45,106,79,0.12); }
-    .card-producto img { width: 100%; height: 110px; object-fit: cover; border-radius: 14px; margin-bottom: 10px; }
-    .card-producto h4 { font-size: 1.05rem; margin-bottom: 6px; color: #1a202c; font-weight: 700; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 2.6em; }
-    .card-producto .precio-usd { color: var(--primary); font-weight: 800; font-size: 1.1rem; }
-    .card-producto .precio-bs { color: #64748b; font-weight: 600; font-size: 0.88rem; margin-top: 2px; }
+    .card-producto:hover { transform: translateY(-5px); border-color: var(--primary-light); box-shadow: var(--shadow-md); }
+    .card-producto:active { transform: scale(0.94); }
+    .card-producto img { width: 100%; height: 100px; object-fit: cover; border-radius: 14px; margin-bottom: 8px; transition: transform 0.3s; }
+    .card-producto:hover img { transform: scale(1.06); }
+    .card-producto h4 { font-size: 1rem; margin-bottom: 4px; color: #1a202c; font-weight: 700; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 2.6em; }
+    .card-producto .precio-usd { color: var(--primary); font-weight: 800; font-size: 1.05rem; }
+    .card-producto .precio-bs { color: #64748b; font-weight: 600; font-size: 0.85rem; margin-top: 2px; }
 
     /* CARRITO FLOTANTE */
     .btn-carrito-flotante {
-      position: fixed; bottom: 25px; right: 25px; background: var(--primary); color: white;
-      border: none; border-radius: 50%; width: 70px; height: 70px; font-size: 1.8rem;
-      box-shadow: 0 10px 25px rgba(45,106,79,0.4); cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s; z-index: 20;
+      position: fixed; bottom: 25px; right: 25px; 
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white;
+      border: none; border-radius: 50%; width: 68px; height: 68px; font-size: 1.7rem;
+      box-shadow: 0 10px 25px rgba(45,106,79,0.4); cursor: pointer; display: flex; justify-content: center; align-items: center; 
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 20;
     }
+    .btn-carrito-flotante:hover { transform: scale(1.08); box-shadow: 0 15px 30px rgba(45,106,79,0.5); }
     .btn-carrito-flotante:active { transform: scale(0.9); }
     .badge-carrito {
       position: absolute; top: -2px; right: -2px; background: var(--danger); color: white;
-      font-size: 0.88rem; border-radius: 50%; width: 26px; height: 26px; display: flex;
+      font-size: 0.85rem; border-radius: 50%; width: 25px; height: 25px; display: flex;
       justify-content: center; align-items: center; font-weight: 800; border: 2px solid white;
+      transition: transform 0.2s;
+    }
+    .badge-carrito.anim-bounce { animation: bounceBadge 0.4s ease-out; }
+
+    /* ELEMENTO VOLADOR PARA ANIMACIÓN DE AGREGAR AL CARRITO */
+    .vuelo-item {
+      position: fixed; z-index: 999; pointer-events: none;
+      width: 60px; height: 60px; border-radius: 50%; object-fit: cover;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+      transition: all 0.75s cubic-bezier(0.55, 0.055, 0.675, 0.19);
     }
 
-    /* MODALES */
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 100; }
-    .modal-contenido { background: white; padding: 25px; border-radius: 24px; width: 90%; max-width: 480px; box-shadow: 0 20px 40px rgba(0,0,0,0.25); max-height: 90vh; overflow-y: auto; }
+    /* MODALES ANIMADOS */
+    .modal { 
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+      background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(5px); 
+      justify-content: center; align-items: center; z-index: 100; opacity: 0; transition: opacity 0.3s ease;
+    }
+    .modal.show { display: flex; opacity: 1; }
+    .modal-contenido { 
+      background: white; padding: 22px; border-radius: 24px; width: 90%; max-width: 480px; 
+      box-shadow: var(--shadow-lg); max-height: 90vh; overflow-y: auto; 
+      transform: scale(0.9); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .modal.show .modal-contenido { transform: scale(1); animation: popIn 0.35s ease-out; }
     
-    .ticket-impresion { background: #fffdf7; padding: 20px; border: 1px dashed #334155; font-family: 'Courier New', Courier, monospace; margin-top: 15px; text-align: left; line-height: 1.4; font-size: 0.95rem; border-radius: 10px; }
-    .btn-action { padding: 13px 20px; border-radius: 14px; border: none; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 1rem; }
-    .btn-action:active { transform: scale(0.97); }
-    .btn-admin-header { background: #f1f5f9; color: var(--text); border: none; padding: 8px 14px; border-radius: 12px; cursor: pointer; font-size: 0.88rem; font-weight: 700; }
+    .ticket-impresion { background: #fffdf7; padding: 18px; border: 1px dashed #334155; font-family: 'Courier New', Courier, monospace; margin-top: 12px; text-align: left; line-height: 1.4; font-size: 0.9rem; border-radius: 10px; }
+    
+    .btn-action { 
+      padding: 12px 18px; border-radius: 14px; border: none; font-weight: 700; cursor: pointer; 
+      transition: all 0.2s ease; font-size: 0.95rem; box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    }
+    .btn-action:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0,0,0,0.12); }
+    .btn-action:active { transform: translateY(1px) scale(0.96); }
+    
+    .btn-admin-header { background: #f1f5f9; color: var(--text); border: none; padding: 7px 12px; border-radius: 10px; cursor: pointer; font-size: 0.85rem; font-weight: 700; transition: background 0.2s; }
+    .btn-admin-header:hover { background: #e2e8f0; }
+    
+    .btn-tara { background: #e2e8f0; border: none; padding: 4px 10px; border-radius: 8px; font-weight: 700; font-size: 0.75rem; color: #334155; cursor: pointer; margin-top: 2px; transition: all 0.2s; }
+    .btn-tara:hover { background: #cbd5e1; }
 
+    #qrcode { display: flex; justify-content: center; margin: 15px 0; }
     input, select { font-size: 0.95rem; }
   </style>
 </head>
@@ -136,12 +229,18 @@
       <div class="header-logo-container">
         <img id="img-logo-header" class="header-logo" src="https://cdn-icons-png.flaticon.com/512/1046/1046857.png" alt="Logo">
         <div>
-          <h2 style="font-size: 1.15rem; font-weight:800;">BÁSCULA POS</h2>
+          <h2 style="font-size: 1.1rem; font-weight:800;">BÁSCULA POS</h2>
           <div class="tasa-ticker">BCV: <span id="tasa-display-header">--.--</span> Bs/$</div>
         </div>
       </div>
-      <div class="peso-display" onclick="simularOModificarPeso()" title="Toca para cambiar peso simulado">⚖️ <span id="peso-val">0</span> <small style="font-size:0.9rem;">g</small></div>
-      <div style="display: flex; gap: 8px;">
+      
+      <div class="peso-box">
+        <div class="peso-display" onclick="simularOModificarPeso()" title="Toca para cambiar peso simulado">⚖️ <span id="peso-val">0</span> <small style="font-size:0.85rem;">g</small></div>
+        <div class="estado-peso" id="estado-peso-lbl">🟢 PESO ESTABLE</div>
+        <button class="btn-tara" onclick="aplicarTara()">[ TARA - 0g ]</button>
+      </div>
+
+      <div style="display: flex; gap: 6px;">
         <button class="btn-admin-header" onclick="solicitarAccesoAdmin()">⚙️ Admin</button>
         <button class="btn-admin-header" style="background: var(--accent); color: var(--primary);" onclick="conectarBLE()">📡 BLE</button>
       </div>
@@ -149,8 +248,11 @@
 
     <div class="contenedor-cuerpo">
       <div class="seccion-top">
-        <h2 id="titulo-seccion" style="color: var(--primary-dark); font-weight: 800; font-size: 1.35rem;">Seleccione una Categoría</h2>
-        <button class="btn-volver-cat" id="btn-volver" onclick="mostrarCategorias()">⬅️ Todas las Categorías</button>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button class="btn-volver-cat" id="btn-volver" onclick="mostrarCategorias()">⬅️ Categorías</button>
+          <h2 id="titulo-seccion" style="color: var(--primary-dark); font-weight: 800; font-size: 1.25rem;">Seleccione una Categoría</h2>
+        </div>
+        <input type="text" class="input-busqueda" id="input-buscar" placeholder="🔍 Buscar producto..." oninput="buscarProductosDirecto()">
       </div>
 
       <!-- VISTA 1: CATEGORÍAS -->
@@ -184,7 +286,7 @@
     </div>
 
     <!-- CARRITO FLOTANTE -->
-    <button class="btn-carrito-flotante" onclick="abrirCarrito()">
+    <button class="btn-carrito-flotante" id="btn-cart-float" onclick="abrirCarrito()">
       🛒
       <div class="badge-carrito" id="cant-carrito">0</div>
     </button>
@@ -194,17 +296,17 @@
   <div class="modal" id="modal-confirmar">
     <div class="modal-contenido" style="text-align: center;">
       <h2 id="modal-prod-nombre" style="color: var(--primary-dark); font-weight:800;">Producto</h2>
-      <img id="modal-prod-img" src="" style="width: 150px; height: 150px; border-radius: 18px; margin: 15px 0; object-fit: cover; box-shadow:0 6px 15px rgba(0,0,0,0.1);">
-      <p style="font-size: 1.15rem; color:#475569;">Peso en Báscula: <b id="modal-peso" style="color:#0f172a;">0</b> g</p>
+      <img id="modal-prod-img" src="" style="width: 140px; height: 140px; border-radius: 18px; margin: 12px 0; object-fit: cover; box-shadow:0 6px 15px rgba(0,0,0,0.1);">
+      <p style="font-size: 1.1rem; color:#475569;">Peso registrado: <b id="modal-peso" style="color:#0f172a;">0</b> g</p>
 
-      <div style="background: var(--accent); padding: 14px; border-radius: 16px; margin: 15px 0;">
-        <div style="font-size: 1.8rem; color: var(--primary-dark); font-weight:800;">$<span id="modal-subtotal-usd">0.00</span></div>
-        <div style="font-size: 1.25rem; color: #2d6a4f; font-weight:700;">Bs. <span id="modal-subtotal-bs">0.00</span></div>
+      <div style="background: var(--accent); padding: 12px; border-radius: 16px; margin: 12px 0;">
+        <div style="font-size: 1.7rem; color: var(--primary-dark); font-weight:800;">$<span id="modal-subtotal-usd">0.00</span></div>
+        <div style="font-size: 1.2rem; color: #2d6a4f; font-weight:700;">Bs. <span id="modal-subtotal-bs">0.00</span></div>
       </div>
 
       <div style="display: flex; gap: 10px;">
         <button class="btn-action" onclick="cerrarModal('modal-confirmar')" style="flex:1; background:#e2e8f0; color:#334155;">Cancelar</button>
-        <button class="btn-action" onclick="confirmarAgregar()" style="flex:1; background:var(--primary); color:white;">Agregar 🛒</button>
+        <button class="btn-action" onclick="confirmarAgregar(event)" style="flex:1; background:var(--primary); color:white;">Agregar 🛒</button>
       </div>
     </div>
   </div>
@@ -213,11 +315,11 @@
   <div class="modal" id="modal-carrito">
     <div class="modal-contenido">
       <h2 style="color: var(--primary-dark); margin-bottom: 12px; font-weight:800;">Su Carrito de Compras</h2>
-      <div id="lista-carrito" style="max-height: 240px; overflow-y: auto; margin: 15px 0; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; padding:12px 0;"></div>
+      <div id="lista-carrito" style="max-height: 220px; overflow-y: auto; margin: 12px 0; border-top:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; padding:10px 0;"></div>
       
       <div style="text-align: right; margin-bottom: 15px;">
-        <div style="font-size: 1.5rem; font-weight:800; color:var(--primary-dark);">Total: $<span id="cart-total-usd">0.00</span></div>
-        <div style="font-size: 1.15rem; font-weight:700; color:#475569;">Bs. <span id="cart-total-bs">0.00</span></div>
+        <div style="font-size: 1.4rem; font-weight:800; color:var(--primary-dark);">Total: $<span id="cart-total-usd">0.00</span></div>
+        <div style="font-size: 1.1rem; font-weight:700; color:#475569;">Bs. <span id="cart-total-bs">0.00</span></div>
       </div>
 
       <div style="display: flex; gap: 10px;">
@@ -231,11 +333,15 @@
   <div class="modal" id="modal-ticket">
     <div class="modal-contenido" style="text-align: center;">
       <h2 style="color:var(--primary-dark); font-weight:800;">¡Ticket Generado!</h2>
-      <p style="font-size: 0.9rem; color: #64748b; margin-top:2px;">Muestre este comprobante en caja para realizar su pago.</p>
+      <p style="font-size: 0.88rem; color: #64748b; margin-top:2px;">Tómale una foto a la pantalla o muestra el QR en caja.</p>
+      
       <div class="ticket-impresion" id="contenido-ticket"></div>
       
-      <div style="display: flex; gap: 10px; margin-top: 18px;">
-        <button class="btn-action" onclick="repetirPesaje()" style="flex:1; background:var(--orange); color:white;">🔄 Repetir / Pesar Otro</button>
+      <!-- CÓDIGO QR -->
+      <div id="qrcode"></div>
+
+      <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <button class="btn-action" onclick="repetirPesaje()" style="flex:1; background:var(--orange); color:white;">🔄 Pesar Otro</button>
         <button class="btn-action" onclick="reiniciarTodo()" style="flex:1; background:var(--primary); color:white;">Aceptar y Salir</button>
       </div>
     </div>
@@ -247,28 +353,28 @@
       <h2 style="color:var(--primary-dark); margin-bottom:14px; font-weight:800;">Panel de Control Admin</h2>
       
       <!-- TASA DÓLAR BCV -->
-      <div style="background:#f8fafc; padding:14px; border-radius:14px; margin-bottom:15px; border:1px solid #e2e8f0;">
+      <div style="background:#f8fafc; padding:12px; border-radius:14px; margin-bottom:12px; border:1px solid #e2e8f0;">
         <h4 style="margin-bottom:6px; color:#1e293b;">💵 Configuración Tasa BCV Oficial</h4>
         <div style="display:flex; gap:8px; align-items:center;">
-          <input type="number" step="0.01" id="adm-tasa" placeholder="Ej: 36.50" style="flex:1; padding:10px; border-radius:10px; border:1px solid #cbd5e1;">
-          <button class="btn-action" onclick="guardarTasaManual()" style="background:var(--primary); color:white; padding:10px 14px; font-size:0.9rem;">Guardar Tasa</button>
+          <input type="number" step="0.01" id="adm-tasa" placeholder="Ej: 36.50" style="flex:1; padding:9px; border-radius:10px; border:1px solid #cbd5e1;">
+          <button class="btn-action" onclick="guardarTasaManual()" style="background:var(--primary); color:white; padding:9px 12px; font-size:0.88rem;">Guardar</button>
         </div>
-        <button onclick="obtenerTasaBCVOnline()" style="margin-top:10px; font-size:0.85rem; background:none; border:none; color:var(--primary); text-decoration:underline; cursor:pointer; font-weight:700;">🔄 Sincronizar Tasa BCV vía Internet</button>
+        <button onclick="obtenerTasaBCVOnline()" style="margin-top:8px; font-size:0.82rem; background:none; border:none; color:var(--primary); text-decoration:underline; cursor:pointer; font-weight:700;">🔄 Sincronizar Tasa BCV vía Internet</button>
       </div>
 
       <!-- LOGO CORPORATIVO -->
-      <div style="background:#f8fafc; padding:14px; border-radius:14px; margin-bottom:15px; border:1px solid #e2e8f0;">
+      <div style="background:#f8fafc; padding:12px; border-radius:14px; margin-bottom:12px; border:1px solid #e2e8f0;">
         <h4 style="margin-bottom:6px; color:#1e293b;">🖼️ Logo de la Empresa</h4>
-        <input type="text" id="adm-logo" placeholder="URL de la imagen del logo" style="width:100%; padding:10px; border-radius:10px; border:1px solid #cbd5e1; margin-bottom:8px;">
-        <button class="btn-action" onclick="actualizarLogo()" style="width:100%; background:#e2e8f0; color:#334155; padding:9px;">Cambiar Logo</button>
+        <input type="text" id="adm-logo" placeholder="URL de la imagen del logo" style="width:100%; padding:9px; border-radius:10px; border:1px solid #cbd5e1; margin-bottom:6px;">
+        <button class="btn-action" onclick="actualizarLogo()" style="width:100%; background:#e2e8f0; color:#334155; padding:8px;">Cambiar Logo</button>
       </div>
 
       <!-- AGREGAR PRODUCTO -->
-      <div style="background:#f8fafc; padding:14px; border-radius:14px; margin-bottom:15px; border:1px solid #e2e8f0;">
-        <h4 style="margin-bottom:8px; color:#1e293b;">🍎 Agregar Nuevo Producto</h4>
-        <input type="text" id="adm-nombre" placeholder="Nombre (ej. Almendras, Queso Blanco)" style="width:100%; padding:9px; margin-bottom:6px; border-radius:10px; border:1px solid #cbd5e1;">
+      <div style="background:#f8fafc; padding:12px; border-radius:14px; margin-bottom:12px; border:1px solid #e2e8f0;">
+        <h4 style="margin-bottom:6px; color:#1e293b;">🍎 Agregar Nuevo Producto</h4>
+        <input type="text" id="adm-nombre" placeholder="Nombre (ej. Almendras)" style="width:100%; padding:8px; margin-bottom:6px; border-radius:10px; border:1px solid #cbd5e1;">
         
-        <select id="adm-categoria" style="width:100%; padding:9px; margin-bottom:6px; border-radius:10px; border:1px solid #cbd5e1; background:white;">
+        <select id="adm-categoria" style="width:100%; padding:8px; margin-bottom:6px; border-radius:10px; border:1px solid #cbd5e1; background:white;">
           <option value="Frutería">Frutería</option>
           <option value="Verdulería">Verdulería</option>
           <option value="Manicería">Manicería</option>
@@ -276,16 +382,16 @@
           <option value="Charcutería">Charcutería</option>
         </select>
 
-        <input type="number" step="0.01" id="adm-precio" placeholder="Precio en $ USD por Kg" style="width:100%; padding:9px; margin-bottom:6px; border-radius:10px; border:1px solid #cbd5e1;">
-        <input type="text" id="adm-img" placeholder="URL Imagen (https://...)" style="width:100%; padding:9px; margin-bottom:10px; border-radius:10px; border:1px solid #cbd5e1;">
-        <button class="btn-action" onclick="guardarProductoAdmin()" style="width:100%; background:var(--primary); color:white; padding:10px;">Guardar Producto</button>
+        <input type="number" step="0.01" id="adm-precio" placeholder="Precio $ por Kg" style="width:100%; padding:8px; margin-bottom:6px; border-radius:10px; border:1px solid #cbd5e1;">
+        <input type="text" id="adm-img" placeholder="URL Imagen (https://...)" style="width:100%; padding:8px; margin-bottom:8px; border-radius:10px; border:1px solid #cbd5e1;">
+        <button class="btn-action" onclick="guardarProductoAdmin()" style="width:100%; background:var(--primary); color:white; padding:9px;">Guardar Producto</button>
       </div>
 
-      <!-- SEGURIDAD Y CAMBIO DE CLAVE -->
-      <div style="background:#f8fafc; padding:14px; border-radius:14px; margin-bottom:15px; border:1px solid #e2e8f0;">
+      <!-- SEGURIDAD -->
+      <div style="background:#f8fafc; padding:12px; border-radius:14px; margin-bottom:12px; border:1px solid #e2e8f0;">
         <h4 style="margin-bottom:6px; color:#1e293b;">🔒 Seguridad</h4>
-        <input type="password" id="adm-nueva-clave" placeholder="Nueva Contraseña" style="width:100%; padding:9px; margin-bottom:8px; border-radius:10px; border:1px solid #cbd5e1;">
-        <button class="btn-action" onclick="cambiarClaveAdmin()" style="width:100%; background:#e2e8f0; color:#334155; padding:9px;">Cambiar Contraseña</button>
+        <input type="password" id="adm-nueva-clave" placeholder="Nueva Contraseña" style="width:100%; padding:8px; margin-bottom:6px; border-radius:10px; border:1px solid #cbd5e1;">
+        <button class="btn-action" onclick="cambiarClaveAdmin()" style="width:100%; background:#e2e8f0; color:#334155; padding:8px;">Cambiar Contraseña</button>
       </div>
 
       <button class="btn-action" onclick="cerrarModal('modal-admin')" style="width:100%; background:#cbd5e1; color:#1e293b;">Cerrar Panel</button>
@@ -293,14 +399,16 @@
   </div>
 
   <script>
-    // PERSISTENCIA
+    // VARIABLES GLOBALES Y PERSISTENCIA
     let tasaBCV = parseFloat(localStorage.getItem('bascula_tasa_bcv')) || 36.50;
     let claveAdmin = localStorage.getItem('bascula_clave_admin') || "1234";
     let logoUrl = localStorage.getItem('bascula_logo_url') || "https://cdn-icons-png.flaticon.com/512/1046/1046857.png";
-    let pesoActualGramos = 0; // Inicia en 0g
+    let pesoBrutoGramos = 0;
+    let taraGramos = 0;
     let carrito = [];
     let productoTemp = null;
     let categoriaSeleccionada = "";
+    let temporizadorInactividad = null;
 
     let productosPredeterminados = [
       { id: 1, nombre: 'Manzana Red', categoria: 'Frutería', precioKg: 2.50, img: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300' },
@@ -319,7 +427,24 @@
       actualizarDisplaysTasa();
       actualizarDisplayPeso();
       obtenerTasaBCVOnline();
+      iniciarMonitoreoInactividad();
     });
+
+    // TEMPORIZADOR DE INACTIVIDAD (60 Segundos)
+    function iniciarMonitoreoInactividad() {
+      const eventos = ['mousemove', 'keydown', 'touchstart', 'click'];
+      eventos.forEach(evt => document.addEventListener(evt, resetearTemporizador));
+      resetearTemporizador();
+    }
+
+    function resetearTemporizador() {
+      clearTimeout(temporizadorInactividad);
+      temporizadorInactividad = setTimeout(() => {
+        if (document.getElementById('pantalla-kiosco').style.display === 'flex') {
+          reiniciarTodo();
+        }
+      }, 60000);
+    }
 
     function aplicarLogo() {
       document.getElementById('img-logo-bienvenida').src = logoUrl;
@@ -332,23 +457,40 @@
       document.getElementById('adm-tasa').value = tasaBCV.toFixed(2);
     }
 
+    // PESO Y TARA
+    function obtenerPesoNeto() {
+      let neto = pesoBrutoGramos - taraGramos;
+      return neto < 0 ? 0 : neto;
+    }
+
     function actualizarDisplayPeso() {
-      document.getElementById('peso-val').innerText = pesoActualGramos;
+      document.getElementById('peso-val').innerText = obtenerPesoNeto();
+    }
+
+    function aplicarTara() {
+      taraGramos = pesoBrutoGramos;
+      actualizarDisplayPeso();
+      alert("Tara aplicada. El peso actual se ha establecido en 0g.");
     }
 
     function simularOModificarPeso() {
-      let nuevo = prompt("Ingresa el peso en gramos para probar (ej. 500 para medio kilo):", pesoActualGramos);
+      let nuevo = prompt("Ingresa el peso en gramos para probar (ej. 500 para medio kilo):", pesoBrutoGramos);
       if (nuevo !== null && !isNaN(nuevo)) {
-        pesoActualGramos = parseInt(nuevo);
-        actualizarDisplayPeso();
+        document.getElementById('estado-peso-lbl').innerText = "🟡 AJUSTANDO...";
+        document.getElementById('estado-peso-lbl').style.color = "#d97706";
+        
+        setTimeout(() => {
+          pesoBrutoGramos = parseInt(nuevo);
+          actualizarDisplayPeso();
+          document.getElementById('estado-peso-lbl').innerText = "🟢 PESO ESTABLE";
+          document.getElementById('estado-peso-lbl').style.color = "#2b9348";
+        }, 400);
       }
     }
 
-    // --- CONSUMO DIRECTO Y ROBUSTO API BCV ---
+    // CONSUMO DIRECTO Y ROBUSTO API BCV
     async function obtenerTasaBCVOnline() {
       const urlDirecta = "https://rates.dolarvzla.com/bcv/current.json";
-      
-      // Intento 1: Conexión directa
       try {
         let response = await fetch(urlDirecta);
         if (response.ok) {
@@ -359,11 +501,8 @@
             return;
           }
         }
-      } catch (e) {
-        console.log("Intentando sincronizar vía respaldo CORS...");
-      }
+      } catch (e) {}
 
-      // Intento 2: Respaldo vía Proxy para evitar bloqueos del navegador en móviles
       try {
         const urlProxy = "https://api.allorigins.win/get?url=" + encodeURIComponent(urlDirecta);
         let responseProxy = await fetch(urlProxy);
@@ -376,9 +515,7 @@
             return;
           }
         }
-      } catch (err) {
-        console.log("No se pudo obtener la tasa en vivo, usando valor local.");
-      }
+      } catch (err) {}
     }
 
     function procesarJSONTasa(data) {
@@ -394,7 +531,7 @@
       tasaBCV = valor;
       localStorage.setItem('bascula_tasa_bcv', tasaBCV);
       actualizarDisplaysTasa();
-      if (categoriaSeleccionada) renderizarProductosGrid();
+      if (categoriaSeleccionada) renderizarProductosGrid(productos.filter(p => p.categoria === categoriaSeleccionada));
     }
 
     function guardarTasaManual() {
@@ -405,7 +542,7 @@
       }
     }
 
-    // --- FLUJO KIOSCO ---
+    // FLUJO KIOSCO
     function iniciarKiosco() {
       document.getElementById('pantalla-inicio').style.display = 'none';
       document.getElementById('pantalla-kiosco').style.display = 'flex';
@@ -414,6 +551,7 @@
 
     function mostrarCategorias() {
       categoriaSeleccionada = "";
+      document.getElementById('input-buscar').value = "";
       document.getElementById('titulo-seccion').innerText = "Seleccione una Categoría";
       document.getElementById('btn-volver').style.display = 'none';
       document.getElementById('vista-categorias').style.display = 'grid';
@@ -422,29 +560,45 @@
 
     function filtrarPorCategoria(cat) {
       categoriaSeleccionada = cat;
+      document.getElementById('input-buscar').value = "";
       document.getElementById('titulo-seccion').innerText = "Categoría: " + cat;
       document.getElementById('btn-volver').style.display = 'flex';
       document.getElementById('vista-categorias').style.display = 'none';
       document.getElementById('vista-productos').style.display = 'grid';
-      renderizarProductosGrid();
+      renderizarProductosGrid(productos.filter(p => p.categoria === cat || (!p.categoria && cat === 'Frutería')));
     }
 
-    function renderizarProductosGrid() {
+    // BUSCADOR EN TIEMPO REAL
+    function buscarProductosDirecto() {
+      let texto = document.getElementById('input-buscar').value.toLowerCase().trim();
+      if (texto.length > 0) {
+        document.getElementById('vista-categorias').style.display = 'none';
+        document.getElementById('vista-productos').style.display = 'grid';
+        document.getElementById('btn-volver').style.display = 'flex';
+        document.getElementById('titulo-seccion').innerText = "Resultados de búsqueda";
+        let coincidencia = productos.filter(p => p.nombre.toLowerCase().includes(texto));
+        renderizarProductosGrid(coincidencia);
+      } else if (categoriaSeleccionada) {
+        filtrarPorCategoria(categoriaSeleccionada);
+      } else {
+        mostrarCategorias();
+      }
+    }
+
+    function renderizarProductosGrid(lista) {
       const grid = document.getElementById('vista-productos');
       grid.innerHTML = '';
-      
-      const prodsFiltrados = productos.filter(p => p.categoria === categoriaSeleccionada || (!p.categoria && categoriaSeleccionada === 'Frutería'));
 
-      if (prodsFiltrados.length === 0) {
-        grid.innerHTML = '<p style="grid-column: 1/-1; text-align:center; padding:30px; color:#64748b; font-weight:600;">No hay productos registrados en esta categoría.</p>';
+      if (lista.length === 0) {
+        grid.innerHTML = '<p style="grid-column: 1/-1; text-align:center; padding:30px; color:#64748b; font-weight:600;">No se encontraron productos.</p>';
         return;
       }
 
-      prodsFiltrados.forEach(p => {
+      lista.forEach(p => {
         let precioBs = p.precioKg * tasaBCV;
         grid.innerHTML += `
           <div class="card-producto" onclick="seleccionarProducto(${p.id})">
-            <img src="${p.img}" alt="${p.nombre}" onerror="this.src='https://via.placeholder.com/200?text=Producto'">
+            <img id="img-prod-${p.id}" src="${p.img}" alt="${p.nombre}" onerror="this.src='https://via.placeholder.com/200?text=Producto'">
             <h4>${p.nombre}</h4>
             <div>
               <div class="precio-usd">$${p.precioKg.toFixed(2)} /kg</div>
@@ -456,35 +610,74 @@
     }
 
     function seleccionarProducto(id) {
-      if (pesoActualGramos === 0) {
-        alert("Atención: El peso actual está en 0 g. Toca el indicador verde arriba para simular peso o conectar Bluetooth.");
+      let pesoNeto = obtenerPesoNeto();
+      if (pesoNeto === 0) {
+        alert("Atención: El peso actual está en 0 g. Toca la balanza verde superior para colocar peso simulado o conectar por Bluetooth.");
       }
       productoTemp = productos.find(p => p.id === id);
-      const subtotalUsd = (pesoActualGramos / 1000) * productoTemp.precioKg;
+      const subtotalUsd = (pesoNeto / 1000) * productoTemp.precioKg;
       const subtotalBs = subtotalUsd * tasaBCV;
       
       document.getElementById('modal-prod-nombre').innerText = productoTemp.nombre;
       document.getElementById('modal-prod-img').src = productoTemp.img;
-      document.getElementById('modal-peso').innerText = pesoActualGramos;
+      document.getElementById('modal-peso').innerText = pesoNeto;
       document.getElementById('modal-subtotal-usd').innerText = subtotalUsd.toFixed(2);
       document.getElementById('modal-subtotal-bs').innerText = subtotalBs.toFixed(2);
       
-      document.getElementById('modal-confirmar').style.display = 'flex';
+      abrirModal('modal-confirmar');
     }
 
-    function confirmarAgregar() {
-      const subtotalUsd = (pesoActualGramos / 1000) * productoTemp.precioKg;
+    function confirmarAgregar(e) {
+      let pesoNeto = obtenerPesoNeto();
+      const subtotalUsd = (pesoNeto / 1000) * productoTemp.precioKg;
       const subtotalBs = subtotalUsd * tasaBCV;
 
       carrito.push({
         nombre: productoTemp.nombre,
-        peso: pesoActualGramos,
+        peso: pesoNeto,
         subtotalUsd: subtotalUsd,
         subtotalBs: subtotalBs
       });
+
+      // Animación voladora al carrito
+      animarVueloAlCarrito(productoTemp.img, e);
       
-      actualizarCarritoBadge();
       cerrarModal('modal-confirmar');
+      actualizarCarritoBadge();
+    }
+
+    // ANIMACIÓN VOLADORA DE ITEM AL CARRITO
+    function animarVueloAlCarrito(imgSrc, event) {
+      const cartBtn = document.getElementById('btn-cart-float');
+      const cartRect = cartBtn.getBoundingClientRect();
+
+      let startX = event ? event.clientX : window.innerWidth / 2;
+      let startY = event ? event.clientY : window.innerHeight / 2;
+
+      const flyImg = document.createElement('img');
+      flyImg.src = imgSrc;
+      flyImg.className = 'vuelo-item';
+      flyImg.style.left = `${startX - 30}px`;
+      flyImg.style.top = `${startY - 30}px`;
+
+      document.body.appendChild(flyImg);
+
+      requestAnimationFrame(() => {
+        flyImg.style.left = `${cartRect.left + cartRect.width / 2 - 15}px`;
+        flyImg.style.top = `${cartRect.top + cartRect.height / 2 - 15}px`;
+        flyImg.style.width = '25px';
+        flyImg.style.height = '25px';
+        flyImg.style.opacity = '0.3';
+        flyImg.style.transform = 'scale(0.3) rotate(360deg)';
+      });
+
+      setTimeout(() => {
+        flyImg.remove();
+        const badge = document.getElementById('cant-carrito');
+        badge.classList.remove('anim-bounce');
+        void badge.offsetWidth; // trigger reflow
+        badge.classList.add('anim-bounce');
+      }, 750);
     }
 
     function actualizarCarritoBadge() {
@@ -520,7 +713,7 @@
 
       document.getElementById('cart-total-usd').innerText = totalUsd.toFixed(2);
       document.getElementById('cart-total-bs').innerText = totalBs.toFixed(2);
-      document.getElementById('modal-carrito').style.display = 'flex';
+      abrirModal('modal-carrito');
     }
 
     function eliminarDelCarrito(index) {
@@ -542,7 +735,7 @@
       let totalBs = 0;
 
       let html = `
-        <div style="text-align:center; margin-bottom:10px;">
+        <div style="text-align:center; margin-bottom:8px;">
           <b>BÁSCULA INTELIGENTE POS</b><br>
           <small>${fechaHora}</small><br>
           <b>SERIAL: ${numSerial}</b><br>
@@ -562,19 +755,22 @@
 
       html += `
         ----------------------------------<br>
-        <div style="font-size:1.1rem; margin-top:5px;">
+        <div style="font-size:1.05rem; margin-top:4px;">
           <b>TOTAL USD: $${totalUsd.toFixed(2)}</b><br>
           <b>TOTAL BS: Bs. ${totalBs.toFixed(2)}</b>
-        </div>
-        <br>
-        <div style="text-align:center;">
-          <div style="background:#000; color:#fff; padding:6px; letter-spacing:5px; font-weight:bold;">|||| || | |||| |||</div>
-          <small style="font-size:0.75rem;">Muestre este ticket en caja</small>
         </div>
       `;
 
       document.getElementById('contenido-ticket').innerHTML = html;
-      document.getElementById('modal-ticket').style.display = 'flex';
+      
+      document.getElementById('qrcode').innerHTML = '';
+      new QRCode(document.getElementById("qrcode"), {
+        text: `${numSerial}|TOTAL:${totalUsd.toFixed(2)}USD|${totalBs.toFixed(2)}BS`,
+        width: 120,
+        height: 120
+      });
+
+      abrirModal('modal-ticket');
     }
 
     function repetirPesaje() {
@@ -583,18 +779,34 @@
 
     function reiniciarTodo() {
       carrito = [];
+      taraGramos = 0;
       actualizarCarritoBadge();
       cerrarModal('modal-ticket');
+      cerrarModal('modal-carrito');
+      cerrarModal('modal-confirmar');
       mostrarCategorias();
       document.getElementById('pantalla-kiosco').style.display = 'none';
       document.getElementById('pantalla-inicio').style.display = 'flex';
+    }
+
+    // MANEJO DE MODALES ANIMADOS
+    function abrirModal(id) {
+      const el = document.getElementById(id);
+      el.style.display = 'flex';
+      requestAnimationFrame(() => el.classList.add('show'));
+    }
+
+    function cerrarModal(id) {
+      const el = document.getElementById(id);
+      el.classList.remove('show');
+      setTimeout(() => { el.style.display = 'none'; }, 250);
     }
 
     // ADMINISTRACIÓN
     function solicitarAccesoAdmin() {
       const pass = prompt("Ingrese la contraseña de Administrador:");
       if (pass === claveAdmin) {
-        document.getElementById('modal-admin').style.display = 'flex';
+        abrirModal('modal-admin');
       } else if (pass !== null) {
         alert("Contraseña incorrecta.");
       }
@@ -637,13 +849,11 @@
         document.getElementById('adm-precio').value = '';
         document.getElementById('adm-img').value = '';
 
-        if (categoriaSeleccionada) renderizarProductosGrid();
+        if (categoriaSeleccionada) filtrarPorCategoria(categoriaSeleccionada);
       } else {
         alert("Por favor ingrese el nombre y el precio.");
       }
     }
-
-    function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
 
     // BLUETOOTH BLE
     async function conectarBLE() {
