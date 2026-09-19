@@ -297,7 +297,7 @@
     let tasaBCV = parseFloat(localStorage.getItem('bascula_tasa_bcv')) || 36.50;
     let claveAdmin = localStorage.getItem('bascula_clave_admin') || "1234";
     let logoUrl = localStorage.getItem('bascula_logo_url') || "https://cdn-icons-png.flaticon.com/512/1046/1046857.png";
-    let pesoActualGramos = 0; // Inicia en 0 gramos hasta conectar la báscula real o cambiarlo
+    let pesoActualGramos = 0; // Inicia en 0g
     let carrito = [];
     let productoTemp = null;
     let categoriaSeleccionada = "";
@@ -344,24 +344,50 @@
       }
     }
 
-    // --- CONSUMO DIRECTO API BCV ---
+    // --- CONSUMO DIRECTO Y ROBUSTO API BCV ---
     async function obtenerTasaBCVOnline() {
-      const url = "https://rates.dolarvzla.com/bcv/current.json";
+      const urlDirecta = "https://rates.dolarvzla.com/bcv/current.json";
+      
+      // Intento 1: Conexión directa
       try {
-        let response = await fetch(url);
+        let response = await fetch(urlDirecta);
         if (response.ok) {
           let data = await response.json();
-          // Extraer la tasa según los campos posibles de este JSON
-          let valor = data?.price || data?.rate || data?.usd || data?.current || data?.bcv || data?.dolar;
-          if (valor && !isNaN(valor) && parseFloat(valor) > 0) {
-            tasaBCV = parseFloat(valor);
-            guardarTasaEnStorage(tasaBCV);
+          let valor = procesarJSONTasa(data);
+          if (valor) {
+            guardarTasaEnStorage(valor);
             return;
           }
         }
       } catch (e) {
-        console.log("No se pudo obtener la tasa en vivo, usando la almacenada.");
+        console.log("Intentando sincronizar vía respaldo CORS...");
       }
+
+      // Intento 2: Respaldo vía Proxy para evitar bloqueos del navegador en móviles
+      try {
+        const urlProxy = "https://api.allorigins.win/get?url=" + encodeURIComponent(urlDirecta);
+        let responseProxy = await fetch(urlProxy);
+        if (responseProxy.ok) {
+          let resData = await responseProxy.json();
+          let data = JSON.parse(resData.contents);
+          let valor = procesarJSONTasa(data);
+          if (valor) {
+            guardarTasaEnStorage(valor);
+            return;
+          }
+        }
+      } catch (err) {
+        console.log("No se pudo obtener la tasa en vivo, usando valor local.");
+      }
+    }
+
+    function procesarJSONTasa(data) {
+      if (!data) return null;
+      let num = data.price || data.rate || data.usd || data.bcv || data.dolar || data.valor || data.current;
+      if (num && !isNaN(num) && parseFloat(num) > 0) {
+        return parseFloat(num);
+      }
+      return null;
     }
 
     function guardarTasaEnStorage(valor) {
@@ -431,7 +457,7 @@
 
     function seleccionarProducto(id) {
       if (pesoActualGramos === 0) {
-        alert("Atención: El peso actual está en 0 g. Toca la balanza verde superior para colocar un peso de prueba o conectar el Bluetooth de la báscula.");
+        alert("Atención: El peso actual está en 0 g. Toca el indicador verde arriba para simular peso o conectar Bluetooth.");
       }
       productoTemp = productos.find(p => p.id === id);
       const subtotalUsd = (pesoActualGramos / 1000) * productoTemp.precioKg;
