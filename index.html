@@ -3,118 +3,137 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kiosco Báscula POS - Verde Fresco</title>
+  <meta name="theme-color" content="#2d6a4f">
+  <title>Kiosco Báscula POS PWA</title>
+  <link rel="manifest" href="manifest.json">
   <style>
     :root {
-      --primary: #2d6a4f;      /* Verde Bosque/Menta Oscuro */
-      --primary-light: #52b788;/* Verde Fresco */
-      --accent: #d8f3dc;       /* Verde Suave Menta */
-      --bg: #f8f9fa;          /* Fondo Suave Descansado */
+      --primary: #2d6a4f;
+      --primary-light: #52b788;
+      --accent: #d8f3dc;
+      --bg: #f8f9fa;
       --card-bg: #ffffff;
       --text: #1b4332;
+      --orange: #f4a261;
+      --danger: #e76f51;
     }
 
-    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; }
-    body { background-color: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; margin: 0; padding: 0; }
+    body { background-color: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; user-select: none; }
 
-    /* PANTALLA DE INICIO / BIENVENIDA */
+    /* PANTALLA INICIO */
     #pantalla-inicio {
       display: flex; flex-direction: column; justify-content: center; align-items: center;
-      height: 100vh; background: linear-gradient(135deg, #2d6a4f, #52b788); color: white; text-align: center; padding: 20px;
+      height: 100vh; background: linear-gradient(135deg, #1b4332, #2d6a4f, #52b788); color: white; text-align: center; padding: 20px;
     }
-    .logo-bienvenida { max-width: 160px; height: auto; margin-bottom: 20px; border-radius: 20px; background: white; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.15); }
-    #pantalla-inicio h1 { font-size: 2.5rem; margin-bottom: 10px; }
+    .logo-bienvenida { max-width: 140px; height: 140px; object-fit: contain; margin-bottom: 15px; border-radius: 20px; background: white; padding: 10px; box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
+    #pantalla-inicio h1 { font-size: 2.3rem; margin-bottom: 8px; font-weight: 800; }
+    .badge-tasa-inicio { background: rgba(255,255,255,0.2); backdrop-filter: blur(5px); padding: 6px 16px; border-radius: 20px; font-size: 0.95rem; margin-bottom: 25px; border: 1px solid rgba(255,255,255,0.3); }
     .btn-comenzar {
-      padding: 18px 45px; font-size: 1.6rem; border: none; border-radius: 50px;
-      background-color: #f4a261; color: white; font-weight: bold; cursor: pointer;
-      box-shadow: 0 6px 15px rgba(0,0,0,0.2); transition: all 0.2s; margin-top: 15px;
+      padding: 18px 45px; font-size: 1.5rem; border: none; border-radius: 50px;
+      background-color: var(--orange); color: white; font-weight: bold; cursor: pointer;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.25); transition: all 0.2s;
     }
     .btn-comenzar:active { transform: scale(0.95); }
 
-    /* HEADER Y PANEL PRINCIPAL */
+    /* HEADER Y PANTALLA PRINCIPAL */
     #pantalla-kiosco { display: none; flex-direction: column; height: 100vh; }
     
     header {
-      background: white; padding: 12px 25px; display: flex; justify-content: space-between;
-      align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-bottom: 3px solid var(--accent);
+      background: white; padding: 10px 20px; display: flex; justify-content: space-between;
+      align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-bottom: 3px solid var(--accent);
     }
-    .header-logo-container { display: flex; align-items: center; gap: 15px; }
-    .header-logo { height: 45px; width: auto; object-fit: contain; }
+    .header-logo-container { display: flex; align-items: center; gap: 12px; }
+    .header-logo { height: 42px; width: auto; object-fit: contain; }
     
     .peso-display {
-      font-size: 1.8rem; font-weight: bold; color: var(--primary); background: var(--accent);
-      padding: 8px 22px; border-radius: 30px; border: 2px solid var(--primary-light);
+      font-size: 1.6rem; font-weight: 800; color: var(--primary); background: var(--accent);
+      padding: 6px 20px; border-radius: 30px; border: 2px solid var(--primary-light); display: flex; align-items: center; gap: 8px;
     }
 
-    /* PRODUCTOS EN MODO LISTA HORIZONTAL (IZQUIERDA A DERECHA) */
+    .tasa-ticker { font-size: 0.85rem; background: #e9ecef; padding: 4px 10px; border-radius: 8px; font-weight: 600; color: #495057; }
+
+    /* CONTENEDOR DE PRODUCTOS (LISTA HORIZONTAL) */
     .contenedor-principal { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
-    .seccion-titulo { font-size: 1.3rem; color: var(--primary); margin-bottom: 10px; font-weight: 700; }
+    .seccion-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .seccion-titulo { font-size: 1.3rem; color: var(--primary); font-weight: 700; }
 
     .carrusel-horizontal {
-      display: flex; gap: 15px; overflow-x: auto; padding-bottom: 10px;
+      display: flex; gap: 16px; overflow-x: auto; padding: 5px 5px 15px 5px;
       scroll-behavior: smooth; -webkit-overflow-scrolling: touch;
     }
-    .carrusel-horizontal::-webkit-scrollbar { height: 6px; }
+    .carrusel-horizontal::-webkit-scrollbar { height: 8px; }
     .carrusel-horizontal::-webkit-scrollbar-thumb { background: var(--primary-light); border-radius: 10px; }
 
     .card-producto-horizontal {
-      min-width: 160px; max-width: 160px; background: var(--card-bg); border-radius: 16px; padding: 12px;
-      text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.04); cursor: pointer;
-      border: 1px solid #e9ecef; transition: all 0.2s; flex-shrink: 0;
+      min-width: 170px; max-width: 170px; background: var(--card-bg); border-radius: 18px; padding: 14px;
+      text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.04); cursor: pointer;
+      border: 1px solid #e9ecef; transition: all 0.2s; flex-shrink: 0; display: flex; flex-direction: column; align-items: center;
     }
-    .card-producto-horizontal:hover { transform: translateY(-3px); border-color: var(--primary-light); }
-    .card-producto-horizontal img { width: 90px; height: 90px; object-fit: cover; border-radius: 12px; }
-    .card-producto-horizontal h4 { font-size: 1.05rem; margin: 8px 0 4px 0; color: #212529; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .card-producto-horizontal p { color: var(--primary); font-weight: bold; font-size: 0.95rem; }
+    .card-producto-horizontal:hover { transform: translateY(-4px); border-color: var(--primary-light); box-shadow: 0 8px 18px rgba(45,106,79,0.12); }
+    .card-producto-horizontal img { width: 100px; height: 100px; object-fit: cover; border-radius: 14px; margin-bottom: 10px; }
+    .card-producto-horizontal h4 { font-size: 1.05rem; margin-bottom: 4px; color: #212529; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+    .card-producto-horizontal .precio-usd { color: var(--primary); font-weight: 800; font-size: 1rem; }
+    .card-producto-horizontal .precio-bs { color: #6c757d; font-weight: 600; font-size: 0.85rem; margin-top: 2px; }
 
-    /* BOTÓN CARRITO FLOTANTE Y BADGE */
+    /* CARRITO FLOTANTE */
     .btn-carrito-flotante {
       position: fixed; bottom: 25px; right: 25px; background: var(--primary); color: white;
-      border: none; border-radius: 50%; width: 65px; height: 65px; font-size: 1.6rem;
-      box-shadow: 0 6px 18px rgba(45,106,79,0.4); cursor: pointer; display: flex; justify-content: center; align-items: center;
+      border: none; border-radius: 50%; width: 68px; height: 68px; font-size: 1.7rem;
+      box-shadow: 0 8px 22px rgba(45,106,79,0.4); cursor: pointer; display: flex; justify-content: center; align-items: center; transition: transform 0.2s;
     }
+    .btn-carrito-flotante:active { transform: scale(0.9); }
     .badge-carrito {
-      position: absolute; top: -2px; right: -2px; background: #e76f51; color: white;
-      font-size: 0.85rem; border-radius: 50%; width: 24px; height: 24px; display: flex;
-      justify-content: center; align-items: center; font-weight: bold;
+      position: absolute; top: -2px; right: -2px; background: var(--danger); color: white;
+      font-size: 0.85rem; border-radius: 50%; width: 25px; height: 25px; display: flex;
+      justify-content: center; align-items: center; font-weight: bold; border: 2px solid white;
     }
 
-    /* MODALES & TICKET */
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 100; }
-    .modal-contenido { background: white; padding: 25px; border-radius: 20px; width: 90%; max-width: 480px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+    /* MODALES */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.55); backdrop-filter: blur(3px); justify-content: center; align-items: center; z-index: 100; }
+    .modal-contenido { background: white; padding: 25px; border-radius: 22px; width: 90%; max-width: 480px; box-shadow: 0 12px 30px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
     
-    .ticket-impresion { background: #fffdf9; padding: 18px; border: 1px dashed #666; font-family: monospace; margin-top: 15px; text-align: left; line-height: 1.4; }
-    .btn-action { padding: 12px 20px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
-    .btn-admin-header { background: #e9ecef; color: var(--text); border: none; padding: 8px 14px; border-radius: 10px; cursor: pointer; font-size: 0.9rem; }
+    .ticket-impresion { background: #fffdf9; padding: 20px; border: 1px dashed #444; font-family: 'Courier New', Courier, monospace; margin-top: 15px; text-align: left; line-height: 1.35; font-size: 0.95rem; border-radius: 8px; }
+    .btn-action { padding: 12px 18px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; transition: 0.2s; font-size: 0.95rem; }
+    .btn-action:active { transform: scale(0.97); }
+    .btn-admin-header { background: #f1f3f5; color: var(--text); border: none; padding: 8px 12px; border-radius: 10px; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+
+    input, select { font-size: 0.95rem; }
   </style>
 </head>
 <body>
 
   <!-- 1. PANTALLA INICIAL (BIENVENIDA) -->
   <div id="pantalla-inicio">
-    <img id="img-logo-bienvenida" class="logo-bienvenida" src="https://via.placeholder.com/150/2d6a4f/ffffff?text=LOGO" alt="Logo">
-    <h1>🛒 Autoservicio Inteligente</h1>
-    <p style="font-size: 1.1rem; opacity: 0.9; margin-bottom: 20px;">Coloque su producto en la báscula para comenzar</p>
+    <img id="img-logo-bienvenida" class="logo-bienvenida" src="https://cdn-icons-png.flaticon.com/512/1046/1046857.png" alt="Logo">
+    <h1>Autoservicio & Báscula</h1>
+    <div class="badge-tasa-inicio">💵 Tasa BCV Oficial: <b id="tasa-display-inicio">Cargando...</b> Bs/$</div>
+    <p style="font-size: 1.1rem; opacity: 0.95; margin-bottom: 25px;">Coloque su producto sobre la balanza para empezar</p>
     <button class="btn-comenzar" onclick="iniciarKiosco()">¡COMENZAR! / PÁCALA</button>
   </div>
 
-  <!-- 2. PANTALLA PRINCIPAL DE PRODUCTOS -->
+  <!-- 2. PANTALLA PRINCIPAL DE PRODUCTOS (KIOSCO) -->
   <div id="pantalla-kiosco">
     <header>
       <div class="header-logo-container">
-        <img id="img-logo-header" class="header-logo" src="https://via.placeholder.com/150/2d6a4f/ffffff?text=LOGO" alt="Logo">
-        <h2 style="font-size: 1.2rem;">Báscula POS</h2>
+        <img id="img-logo-header" class="header-logo" src="https://cdn-icons-png.flaticon.com/512/1046/1046857.png" alt="Logo">
+        <div>
+          <h2 style="font-size: 1.1rem; font-weight:800;">BÁSCULA POS</h2>
+          <div class="tasa-ticker">BCV: <span id="tasa-display-header">--.--</span> Bs/$</div>
+        </div>
       </div>
-      <div class="peso-display">⚖️ <span id="peso-val">350</span> g</div>
-      <div style="display: flex; gap: 8px;">
+      <div class="peso-display">⚖️ <span id="peso-val">350</span> <small style="font-size:0.9rem;">g</small></div>
+      <div style="display: flex; gap: 6px;">
         <button class="btn-admin-header" onclick="solicitarAccesoAdmin()">⚙️ Admin</button>
         <button class="btn-admin-header" style="background: var(--accent); color: var(--primary);" onclick="conectarBLE()">📡 BLE</button>
       </div>
     </header>
 
     <div class="contenedor-principal">
-      <div class="seccion-titulo">🍎 Frutas y Verduras (Desliza a los lados)</div>
-      <!-- LISTA HORIZONTAL CON SCROLL DE IZQUIERDA A DERECHA -->
+      <div class="seccion-header">
+        <div class="seccion-titulo">🍎 Productos Disponibles (Desliza ↔️)</div>
+      </div>
+      <!-- CARRUSEL HORIZONTAL -->
       <div class="carrusel-horizontal" id="carrusel-productos">
         <!-- Generado dinámicamente -->
       </div>
@@ -130,95 +149,198 @@
   <!-- MODAL DE CONFIRMACIÓN AL TOCAR UN PRODUCTO -->
   <div class="modal" id="modal-confirmar">
     <div class="modal-contenido" style="text-align: center;">
-      <h2 id="modal-prod-nombre">Producto</h2>
-      <img id="modal-prod-img" src="" style="width: 130px; height: 130px; border-radius: 15px; margin: 15px 0; object-fit: cover;">
-      <p style="font-size: 1.1rem;">Peso en Báscula: <b id="modal-peso">0</b> g</p>
-      <p style="font-size: 1.6rem; color: var(--primary); margin: 10px 0;">Subtotal: $<span id="modal-subtotal">0.00</span></p>
-      <div style="display: flex; gap: 10px; margin-top: 15px;">
+      <h2 id="modal-prod-nombre" style="color: var(--primary);">Producto</h2>
+      <img id="modal-prod-img" src="" style="width: 140px; height: 140px; border-radius: 16px; margin: 15px 0; object-fit: cover; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+      <p style="font-size: 1.1rem; color:#495057;">Peso en Báscula: <b id="modal-peso" style="color:#000;">0</b> g</p>
+
+      <div style="background: var(--accent); padding: 12px; border-radius: 14px; margin: 15px 0;">
+        <div style="font-size: 1.7rem; color: var(--primary); font-weight:800;">$<span id="modal-subtotal-usd">0.00</span></div>
+        <div style="font-size: 1.2rem; color: #2d6a4f; font-weight:700;">Bs. <span id="modal-subtotal-bs">0.00</span></div>
+      </div>
+
+      <div style="display: flex; gap: 10px;">
         <button class="btn-action" onclick="cerrarModal('modal-confirmar')" style="flex:1; background:#e9ecef;">Cancelar</button>
         <button class="btn-action" onclick="confirmarAgregar()" style="flex:1; background:var(--primary); color:white;">Agregar 🛒</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL CARRITO / FACTURA -->
+  <!-- MODAL CARRITO / RESUMEN -->
   <div class="modal" id="modal-carrito">
     <div class="modal-contenido">
-      <h2>Su Carrito de Compras</h2>
-      <div id="lista-carrito" style="max-height: 220px; overflow-y: auto; margin: 15px 0;"></div>
-      <h3 style="text-align: right; color: var(--primary);">Total: $<span id="cart-total">0.00</span></h3>
-      <div style="display: flex; gap: 10px; margin-top: 20px;">
+      <h2 style="color: var(--primary); margin-bottom: 10px;">Su Carrito de Compras</h2>
+      <div id="lista-carrito" style="max-height: 220px; overflow-y: auto; margin: 15px 0; border-top:1px solid #eee; border-bottom:1px solid #eee; padding:10px 0;"></div>
+      
+      <div style="text-align: right; margin-bottom: 15px;">
+        <div style="font-size: 1.4rem; font-weight:800; color:var(--primary);">Total: $<span id="cart-total-usd">0.00</span></div>
+        <div style="font-size: 1.1rem; font-weight:700; color:#495057;">Bs. <span id="cart-total-bs">0.00</span></div>
+      </div>
+
+      <div style="display: flex; gap: 10px;">
         <button class="btn-action" onclick="cerrarModal('modal-carrito')" style="flex:1; background:#e9ecef;">Seguir Pesando</button>
-        <button class="btn-action" onclick="generarTicket()" style="flex:1; background:var(--primary-light); color:white;">Generar Ticket</button>
+        <button class="btn-action" onclick="generarTicket()" style="flex:1; background:var(--primary); color:white;">Generar Ticket</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL TICKET CON OPCIÓN DE REPETIR -->
+  <!-- MODAL TICKET CON SERIE Y TASA BCV -->
   <div class="modal" id="modal-ticket">
     <div class="modal-contenido" style="text-align: center;">
-      <h2>¡Ticket Listo!</h2>
-      <p style="font-size: 0.9rem; color: #666;">Entregue este comprobante en caja para realizar su pago.</p>
+      <h2 style="color:var(--primary);">¡Ticket Generado!</h2>
+      <p style="font-size: 0.85rem; color: #666; margin-top:2px;">Muestre este comprobante en caja para realizar su pago.</p>
       <div class="ticket-impresion" id="contenido-ticket"></div>
-      <div style="display: flex; gap: 10px; margin-top: 20px;">
-        <button class="btn-action" onclick="repetirPesaje()" style="flex:1; background:#f4a261; color:white;">🔄 Repetir / Nuevo Pesaje</button>
+      
+      <div style="display: flex; gap: 10px; margin-top: 18px;">
+        <button class="btn-action" onclick="repetirPesaje()" style="flex:1; background:var(--orange); color:white;">🔄 Repetir / Pesar Otro</button>
         <button class="btn-action" onclick="reiniciarTodo()" style="flex:1; background:var(--primary); color:white;">Aceptar y Salir</button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL ADMINISTRADOR PROTEGIDO -->
+  <!-- MODAL ADMINISTRADOR (CONFIGURACIÓN) -->
   <div class="modal" id="modal-admin">
     <div class="modal-contenido">
-      <h2>Configuración y Productos</h2>
-      <p style="font-size:0.9rem; color:#666; margin-bottom:12px;">Agrega productos o actualiza el logo corporativo:</p>
+      <h2 style="color:var(--primary); margin-bottom:12px;">Panel de Control</h2>
       
-      <input type="text" id="adm-logo" placeholder="URL del Logo (https://...)" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ccc;">
-      <button class="btn-action" onclick="actualizarLogo()" style="width:100%; background:#e9ecef; margin-bottom:15px;">Cambiar Logo</button>
-
-      <hr style="margin-bottom:15px;">
-      <h4>Nuevo Producto:</h4>
-      <input type="text" id="adm-nombre" placeholder="Nombre (ej. Manzana)" style="width:100%; padding:10px; margin:8px 0; border-radius:8px; border:1px solid #ccc;">
-      <input type="number" id="adm-precio" placeholder="Precio por Kg ($)" style="width:100%; padding:10px; margin-bottom:8px; border-radius:8px; border:1px solid #ccc;">
-      <input type="text" id="adm-img" placeholder="URL Imagen (https://...)" style="width:100%; padding:10px; margin-bottom:15px; border-radius:8px; border:1px solid #ccc;">
-      
-      <div style="display: flex; gap: 10px;">
-        <button class="btn-action" onclick="cerrarModal('modal-admin')" style="flex:1; background:#e9ecef;">Cerrar</button>
-        <button class="btn-action" onclick="guardarProductoAdmin()" style="flex:1; background:var(--primary); color:white;">Guardar</button>
+      <!-- TASA DÓLAR BCV -->
+      <div style="background:#f1f3f5; padding:12px; border-radius:12px; margin-bottom:15px;">
+        <h4 style="margin-bottom:6px;">💵 Configuración Tasa BCV</h4>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="number" step="0.01" id="adm-tasa" placeholder="Ej: 36.50" style="flex:1; padding:8px; border-radius:8px; border:1px solid #ccc;">
+          <button class="btn-action" onclick="guardarTasaManual()" style="background:var(--primary); color:white; padding:8px 12px;">Guardar Tasa</button>
+        </div>
+        <button onclick="obtenerTasaBCVOnline()" style="margin-top:8px; font-size:0.8rem; background:none; border:none; color:var(--primary); text-decoration:underline; cursor:pointer;">🔄 Actualizar por Internet desde API BCV</button>
       </div>
+
+      <!-- LOGO CORPORATIVO -->
+      <div style="background:#f1f3f5; padding:12px; border-radius:12px; margin-bottom:15px;">
+        <h4 style="margin-bottom:6px;">🖼️ Logo de la Empresa</h4>
+        <input type="text" id="adm-logo" placeholder="URL de la imagen del logo" style="width:100%; padding:8px; border-radius:8px; border:1px solid #ccc; margin-bottom:6px;">
+        <button class="btn-action" onclick="actualizarLogo()" style="width:100%; background:#e9ecef; padding:8px;">Cambiar Logo</button>
+      </div>
+
+      <!-- AGREGAR PRODUCTO -->
+      <div style="background:#f1f3f5; padding:12px; border-radius:12px; margin-bottom:15px;">
+        <h4 style="margin-bottom:6px;">🍎 Agregar Nuevo Producto</h4>
+        <input type="text" id="adm-nombre" placeholder="Nombre (ej. Manzana)" style="width:100%; padding:8px; margin:4px 0; border-radius:8px; border:1px solid #ccc;">
+        <input type="number" step="0.01" id="adm-precio" placeholder="Precio en $ USD por Kg" style="width:100%; padding:8px; margin-bottom:4px; border-radius:8px; border:1px solid #ccc;">
+        <input type="text" id="adm-img" placeholder="URL Imagen (https://...)" style="width:100%; padding:8px; margin-bottom:8px; border-radius:8px; border:1px solid #ccc;">
+        <button class="btn-action" onclick="guardarProductoAdmin()" style="width:100%; background:var(--primary); color:white; padding:8px;">Guardar Producto</button>
+      </div>
+
+      <!-- SEGURIDAD Y CAMBIO DE CLAVE -->
+      <div style="background:#f1f3f5; padding:12px; border-radius:12px; margin-bottom:15px;">
+        <h4 style="margin-bottom:6px;">🔒 Seguridad</h4>
+        <input type="password" id="adm-nueva-clave" placeholder="Nueva Contraseña" style="width:100%; padding:8px; margin-bottom:6px; border-radius:8px; border:1px solid #ccc;">
+        <button class="btn-action" onclick="cambiarClaveAdmin()" style="width:100%; background:#e9ecef; padding:8px;">Cambiar Contraseña</button>
+      </div>
+
+      <button class="btn-action" onclick="cerrarModal('modal-admin')" style="width:100%; background:#e9ecef;">Cerrar Panel</button>
     </div>
   </div>
 
   <script>
-    const CLAVE_ADMIN = "1234"; // Clave del administrador
-    let pesoActualGramos = 350; // Peso simulado (o recibido de la ESP32 por BLE)
+    // --- PERSISTENCIA Y VARIABLES DE ESTADO ---
+    let tasaBCV = parseFloat(localStorage.getItem('bascula_tasa_bcv')) || 36.50;
+    let claveAdmin = localStorage.getItem('bascula_clave_admin') || "1234";
+    let logoUrl = localStorage.getItem('bascula_logo_url') || "https://cdn-icons-png.flaticon.com/512/1046/1046857.png";
+    let pesoActualGramos = 350; // Valor por defecto / simulado
     let carrito = [];
     let productoTemp = null;
 
-    let productos = [
+    let productosPredeterminados = [
       { id: 1, nombre: 'Manzana Red', precioKg: 2.50, img: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=200' },
-      { id: 2, nombre: 'Cambur', precioKg: 1.20, img: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=200' },
+      { id: 2, nombre: 'Cambur / Banana', precioKg: 1.20, img: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=200' },
       { id: 3, nombre: 'Zanahoria', precioKg: 1.80, img: 'https://images.unsplash.com/photo-1598170845058-12ef4a457939?w=200' },
       { id: 4, nombre: 'Tomate', precioKg: 3.00, img: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=200' },
-      { id: 5, nombre: 'Aguacate', precioKg: 4.50, img: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=200' }
+      { id: 5, nombre: 'Aguacate', precioKg: 4.50, img: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=200' },
+      { id: 6, nombre: 'Cebolla', precioKg: 2.10, img: 'https://images.unsplash.com/photo-1508747703725-719777637510?w=200' }
     ];
 
+    let productos = JSON.parse(localStorage.getItem('bascula_productos')) || productosPredeterminados;
+
+    // INICIALIZACIÓN
+    window.addEventListener('DOMContentLoaded', () => {
+      aplicarLogo();
+      actualizarDisplaysTasa();
+      obtenerTasaBCVOnline(); // Intenta actualizar automáticamente si hay internet
+    });
+
+    function aplicarLogo() {
+      document.getElementById('img-logo-bienvenida').src = logoUrl;
+      document.getElementById('img-logo-header').src = logoUrl;
+    }
+
+    function actualizarDisplaysTasa() {
+      document.getElementById('tasa-display-inicio').innerText = tasaBCV.toFixed(2);
+      document.getElementById('tasa-display-header').innerText = tasaBCV.toFixed(2);
+      document.getElementById('adm-tasa').value = tasaBCV.toFixed(2);
+    }
+
+    // --- CONSUMO DE API DÓLAR BCV CON FALLBACK ---
+    async function obtenerTasaBCVOnline() {
+      const api1 = "https://pydolarvenezuela-api.vercel.app/api/v1/dollar?page=bcv";
+      const api2 = "https://rates.dolarvzla.com/bcv/current.json";
+
+      try {
+        let response = await fetch(api1);
+        if (response.ok) {
+          let data = await response.json();
+          let valor = data?.monitors?.usd?.price || data?.price || data?.promedio;
+          if (valor) {
+            tasaBCV = parseFloat(valor);
+            guardarTasaEnStorage(tasaBCV);
+            return;
+          }
+        }
+      } catch (e) { console.log("API 1 no disponible, intentando API 2..."); }
+
+      try {
+        let response = await fetch(api2);
+        if (response.ok) {
+          let data = await response.json();
+          let valor = data?.price || data?.rate || data?.usd;
+          if (valor) {
+            tasaBCV = parseFloat(valor);
+            guardarTasaEnStorage(tasaBCV);
+            return;
+          }
+        }
+      } catch (e) { console.log("API 2 no disponible. Usando tasa almacenada."); }
+    }
+
+    function guardarTasaEnStorage(valor) {
+      tasaBCV = valor;
+      localStorage.setItem('bascula_tasa_bcv', tasaBCV);
+      actualizarDisplaysTasa();
+    }
+
+    function guardarTasaManual() {
+      let val = parseFloat(document.getElementById('adm-tasa').value);
+      if (val && val > 0) {
+        guardarTasaEnStorage(val);
+        alert("Tasa BCV actualizada a: " + val.toFixed(2) + " Bs/$");
+      }
+    }
+
+    // --- FLUJO KIOSCO ---
     function iniciarKiosco() {
       document.getElementById('pantalla-inicio').style.display = 'none';
       document.getElementById('pantalla-kiosco').style.display = 'flex';
       renderizarCarrusel();
     }
 
-    // LISTA HORIZONTAL CON SCROLL DE IZQUIERDA A DERECHA
     function renderizarCarrusel() {
       const carrusel = document.getElementById('carrusel-productos');
       carrusel.innerHTML = '';
       productos.forEach(p => {
+        let precioBs = p.precioKg * tasaBCV;
         carrusel.innerHTML += `
           <div class="card-producto-horizontal" onclick="seleccionarProducto(${p.id})">
-            <img src="${p.img}" alt="${p.nombre}">
+            <img src="${p.img}" alt="${p.nombre}" onerror="this.src='https://via.placeholder.com/150?text=Fruta'">
             <h4>${p.nombre}</h4>
-            <p>$${p.precioKg.toFixed(2)} /kg</p>
+            <div class="precio-usd">$${p.precioKg.toFixed(2)} /kg</div>
+            <div class="precio-bs">Bs. ${precioBs.toFixed(2)} /kg</div>
           </div>
         `;
       });
@@ -226,18 +348,29 @@
 
     function seleccionarProducto(id) {
       productoTemp = productos.find(p => p.id === id);
-      const subtotal = (pesoActualGramos / 1000) * productoTemp.precioKg;
+      const subtotalUsd = (pesoActualGramos / 1000) * productoTemp.precioKg;
+      const subtotalBs = subtotalUsd * tasaBCV;
       
       document.getElementById('modal-prod-nombre').innerText = productoTemp.nombre;
       document.getElementById('modal-prod-img').src = productoTemp.img;
       document.getElementById('modal-peso').innerText = pesoActualGramos;
-      document.getElementById('modal-subtotal').innerText = subtotal.toFixed(2);
+      document.getElementById('modal-subtotal-usd').innerText = subtotalUsd.toFixed(2);
+      document.getElementById('modal-subtotal-bs').innerText = subtotalBs.toFixed(2);
+      
       document.getElementById('modal-confirmar').style.display = 'flex';
     }
 
     function confirmarAgregar() {
-      const subtotal = (pesoActualGramos / 1000) * productoTemp.precioKg;
-      carrito.push({ nombre: productoTemp.nombre, peso: pesoActualGramos, subtotal: subtotal });
+      const subtotalUsd = (pesoActualGramos / 1000) * productoTemp.precioKg;
+      const subtotalBs = subtotalUsd * tasaBCV;
+
+      carrito.push({
+        nombre: productoTemp.nombre,
+        peso: pesoActualGramos,
+        subtotalUsd: subtotalUsd,
+        subtotalBs: subtotalBs
+      });
+      
       actualizarCarritoBadge();
       cerrarModal('modal-confirmar');
     }
@@ -249,44 +382,91 @@
     function abrirCarrito() {
       const contenedor = document.getElementById('lista-carrito');
       contenedor.innerHTML = '';
-      let total = 0;
+      let totalUsd = 0;
+      let totalBs = 0;
 
-      carrito.forEach(item => {
-        total += item.subtotal;
-        contenedor.innerHTML += `
-          <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:5px;">
-            <span><b>${item.nombre}</b> (${item.peso}g)</span>
-            <span>$${item.subtotal.toFixed(2)}</span>
-          </div>
-        `;
-      });
+      if (carrito.length === 0) {
+        contenedor.innerHTML = '<p style="text-align:center; color:#888;">El carrito está vacío</p>';
+      } else {
+        carrito.forEach((item, index) => {
+          totalUsd += item.subtotalUsd;
+          totalBs += item.subtotalBs;
+          contenedor.innerHTML += `
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px; align-items:center;">
+              <div>
+                <b>${item.nombre}</b> <small>(${item.peso}g)</small>
+                <div style="font-size:0.8rem; color:#666;">Bs. ${item.subtotalBs.toFixed(2)}</div>
+              </div>
+              <div style="text-align:right;">
+                <b>$${item.subtotalUsd.toFixed(2)}</b>
+                <br><button onclick="eliminarDelCarrito(${index})" style="background:none; border:none; color:red; font-size:0.75rem; cursor:pointer;">Eliminar</button>
+              </div>
+            </div>
+          `;
+        });
+      }
 
-      document.getElementById('cart-total').innerText = total.toFixed(2);
+      document.getElementById('cart-total-usd').innerText = totalUsd.toFixed(2);
+      document.getElementById('cart-total-bs').innerText = totalBs.toFixed(2);
       document.getElementById('modal-carrito').style.display = 'flex';
     }
 
+    function eliminarDelCarrito(index) {
+      carrito.splice(index, 1);
+      actualizarCarritoBadge();
+      abrirCarrito();
+    }
+
     function generarTicket() {
+      if (carrito.length === 0) {
+        alert("Agregue al menos un producto al carrito para generar el ticket.");
+        return;
+      }
       cerrarModal('modal-carrito');
-      const numTicket = Math.floor(100000 + Math.random() * 900000);
-      let total = 0;
-      let html = `<b>TICKET DE COMPRA #${numTicket}</b><br>----------------------------------<br>`;
+
+      const numSerial = "TK-" + Math.floor(100000 + Math.random() * 900000);
+      const fechaHora = new Date().toLocaleString('es-VE');
+      let totalUsd = 0;
+      let totalBs = 0;
+
+      let html = `
+        <div style="text-align:center; margin-bottom:10px;">
+          <b>BÁSCULA INTELIGENTE POS</b><br>
+          <small>${fechaHora}</small><br>
+          <b>SERIAL: ${numSerial}</b><br>
+          <small>Tasa Ref. BCV: ${tasaBCV.toFixed(2)} Bs/$</small>
+        </div>
+        ----------------------------------<br>
+      `;
 
       carrito.forEach(item => {
-        total += item.subtotal;
-        html += `${item.nombre}<br>${item.peso}g -> $${item.subtotal.toFixed(2)}<br>`;
+        totalUsd += item.subtotalUsd;
+        totalBs += item.subtotalBs;
+        html += `
+          <b>${item.nombre}</b> (${item.peso}g)<br>
+          $${item.subtotalUsd.toFixed(2)} | Bs. ${item.subtotalBs.toFixed(2)}<br>
+        `;
       });
 
-      html += `----------------------------------<br><b>TOTAL A PAGAR: $${total.toFixed(2)}</b><br><br>`;
-      html += `<div style="background:#000; color:#fff; padding:8px; letter-spacing:4px; text-align:center;">||| | |||| | ||| |||</div>`;
+      html += `
+        ----------------------------------<br>
+        <div style="font-size:1.1rem; margin-top:5px;">
+          <b>TOTAL USD: $${totalUsd.toFixed(2)}</b><br>
+          <b>TOTAL BS: Bs. ${totalBs.toFixed(2)}</b>
+        </div>
+        <br>
+        <div style="text-align:center;">
+          <div style="background:#000; color:#fff; padding:6px; letter-spacing:5px; font-weight:bold;">|||| || | |||| |||</div>
+          <small style="font-size:0.75rem;">Muestre este ticket en caja</small>
+        </div>
+      `;
 
       document.getElementById('contenido-ticket').innerHTML = html;
       document.getElementById('modal-ticket').style.display = 'flex';
     }
 
-    // OPCIÓN DE REPETIR PESAJE RÁPIDO
     function repetirPesaje() {
       cerrarModal('modal-ticket');
-      // Mantiene la vista del kiosco lista para pesar otro producto
     }
 
     function reiniciarTodo() {
@@ -297,39 +477,82 @@
       document.getElementById('pantalla-inicio').style.display = 'flex';
     }
 
-    // ADMINISTRADOR PROTEGIDO CON CLAVE
+    // --- ADMINISTRACIÓN ---
     function solicitarAccesoAdmin() {
       const pass = prompt("Ingrese la clave de Administrador:");
-      if (pass === CLAVE_ADMIN) {
+      if (pass === claveAdmin) {
         document.getElementById('modal-admin').style.display = 'flex';
       } else if (pass !== null) {
-        alert("Clave incorrecta.");
+        alert("Contraseña incorrecta.");
+      }
+    }
+
+    function cambiarClaveAdmin() {
+      let nueva = document.getElementById('adm-nueva-clave').value;
+      if (nueva && nueva.length >= 4) {
+        claveAdmin = nueva;
+        localStorage.setItem('bascula_clave_admin', claveAdmin);
+        alert("Contraseña modificada exitosamente.");
+        document.getElementById('adm-nueva-clave').value = '';
+      } else {
+        alert("La contraseña debe tener al menos 4 caracteres.");
       }
     }
 
     function actualizarLogo() {
       const url = document.getElementById('adm-logo').value;
       if (url) {
-        document.getElementById('img-logo-bienvenida').src = url;
-        document.getElementById('img-logo-header').src = url;
-        alert("Logo actualizado correctamente.");
+        logoUrl = url;
+        localStorage.setItem('bascula_logo_url', logoUrl);
+        aplicarLogo();
+        alert("Logo actualizado.");
       }
     }
 
     function guardarProductoAdmin() {
       const nombre = document.getElementById('adm-nombre').value;
       const precio = parseFloat(document.getElementById('adm-precio').value);
-      const img = document.getElementById('adm-img').value || 'https://via.placeholder.com/150';
+      const img = document.getElementById('adm-img').value || 'https://via.placeholder.com/150?text=Fruta';
 
       if (nombre && precio) {
         productos.push({ id: Date.now(), nombre, precioKg: precio, img });
+        localStorage.setItem('bascula_productos', JSON.stringify(productos));
         renderizarCarrusel();
-        cerrarModal('modal-admin');
+        alert("Producto guardado exitosamente.");
+        document.getElementById('adm-nombre').value = '';
+        document.getElementById('adm-precio').value = '';
+        document.getElementById('adm-img').value = '';
+      } else {
+        alert("Por favor complete nombre y precio.");
       }
     }
 
     function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
-    async function conectarBLE() { alert("Buscando señal Bluetooth de la ESP32..."); }
+
+    // BLUETOOTH BLE
+    async function conectarBLE() {
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ['4fafc201-1fb5-459e-8fcc-c5c9c331914b']
+        });
+        const server = await device.gatt.connect();
+        alert("Conectado a la Báscula BLE exitosamente.");
+      } catch (e) {
+        alert("Simulación activa: " + e.message);
+      }
+    }
+  </script>
+
+  <!-- REGISTRO DEL SERVICE WORKER (OFFLINE PWA) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(() => console.log("Service Worker Registrado Exitosamente"))
+          .catch((err) => console.log("Error al registrar SW:", err));
+      });
+    }
   </script>
 </body>
 </html>
