@@ -6,8 +6,6 @@
   <meta name="theme-color" content="#1b4332">
   <title>Kiosco Báscula POS PWA</title>
   <link rel="manifest" href="manifest.json">
-  <!-- Librería ligera para generar Código QR -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     :root {
       --primary: #2d6a4f;
@@ -221,7 +219,6 @@
     .btn-tara { background: #e2e8f0; border: none; padding: 4px 10px; border-radius: 8px; font-weight: 700; font-size: 0.75rem; color: #334155; cursor: pointer; margin-top: 2px; transition: all 0.2s; }
     .btn-tara:hover { background: #cbd5e1; }
 
-    #qrcode { display: flex; justify-content: center; margin: 15px 0; }
     input, select { font-size: 0.95rem; }
   </style>
 </head>
@@ -348,12 +345,9 @@
   <div class="modal" id="modal-ticket">
     <div class="modal-contenido" style="text-align: center;">
       <h2 style="color:var(--primary-dark); font-weight:800;">¡Ticket Generado!</h2>
-      <p style="font-size: 0.88rem; color: #64748b; margin-top:2px;">Tómale una foto a la pantalla o imprime tu comanda.</p>
+      <p style="font-size: 0.88rem; color: #64748b; margin-top:2px;">Imprime tu ticket de comanda para caja.</p>
       
       <div class="ticket-impresion" id="contenido-ticket"></div>
-      
-      <!-- CÓDIGO QR -->
-      <div id="qrcode"></div>
 
       <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 15px;">
         <button class="btn-action" onclick="imprimirTicketBluetooth()" style="background:#2563eb; color:white;">🖨️ Imprimir Ticket (Bluetooth)</button>
@@ -467,16 +461,13 @@
       const fIngreso = new Date(p.fechaIngreso);
       const fHoy = new Date();
       
-      // Diferencia en días transcurridos
       const diffTiempo = Math.abs(fHoy - fIngreso);
       const diasTranscurridos = Math.floor(diffTiempo / (1000 * 60 * 60 * 24));
       const diasRestantes = p.diasVida - diasTranscurridos;
 
       if (diasRestantes <= 0) {
-        // Día límite o vencido: REMATE -50%
         return { descuento: 50, etiqueta: 'REMATE -50%', precioFinal: p.precioKg * 0.50 };
       } else if (diasRestantes === 1) {
-        // 1 día para vencimiento: OFERTA -20%
         return { descuento: 20, etiqueta: 'OFERTA -20%', precioFinal: p.precioKg * 0.80 };
       }
       
@@ -720,14 +711,11 @@
         subtotalBs: subtotalBs
       });
 
-      // Animación voladora al carrito
       animarVueloAlCarrito(productoTemp.img, e);
-      
       cerrarModal('modal-confirmar');
       actualizarCarritoBadge();
     }
 
-    // ANIMACIÓN VOLADORA DE ITEM AL CARRITO
     function animarVueloAlCarrito(imgSrc, event) {
       const cartBtn = document.getElementById('btn-cart-float');
       const cartRect = cartBtn.getBoundingClientRect();
@@ -756,7 +744,7 @@
         flyImg.remove();
         const badge = document.getElementById('cant-carrito');
         badge.classList.remove('anim-bounce');
-        void badge.offsetWidth; // trigger reflow
+        void badge.offsetWidth;
         badge.classList.add('anim-bounce');
       }, 750);
     }
@@ -853,14 +841,6 @@
       `;
 
       document.getElementById('contenido-ticket').innerHTML = html;
-      
-      document.getElementById('qrcode').innerHTML = '';
-      new QRCode(document.getElementById("qrcode"), {
-        text: `${numSerial}|TOTAL:${totalUsd.toFixed(2)}USD|${totalBs.toFixed(2)}BS`,
-        width: 120,
-        height: 120
-      });
-
       abrirModal('modal-ticket');
     }
 
@@ -872,7 +852,7 @@
       }
 
       if (!navigator.bluetooth) {
-        alert("Tu navegador o tablet no soporta la API Web Bluetooth. Asegúrate de usar Chrome o Edge con Bluetooth activado.");
+        alert("Tu navegador o tablet no soporta la API Web Bluetooth. Asegúrate de usar Chrome con Bluetooth activado.");
         return;
       }
 
@@ -894,7 +874,6 @@
         const characteristics = await service.getCharacteristics();
         const characteristic = characteristics[0];
 
-        // Construcción del Ticket en Formato Texto ESC/POS
         let texto = `================================\n`;
         texto += `        FRUTERIA POS        \n`;
         texto += `================================\n`;
