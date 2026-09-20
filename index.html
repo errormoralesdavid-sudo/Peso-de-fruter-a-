@@ -371,7 +371,7 @@
           <input type="number" step="0.01" id="adm-tasa" placeholder="Ej: 36.50" style="flex:1; padding:9px; border-radius:10px; border:1px solid #cbd5e1;">
           <button class="btn-action" onclick="guardarTasaManual()" style="background:var(--primary); color:white; padding:9px 12px; font-size:0.88rem;">Guardar</button>
         </div>
-        <button onclick="obtenerTasaBCVOnline()" style="margin-top:8px; font-size:0.82rem; background:none; border:none; color:var(--primary); text-decoration:underline; cursor:pointer; font-weight:700;">🔄 Sincronizar Tasa BCV vía Internet</button>
+        <button id="btn-sincronizar" onclick="obtenerTasaBCVOnline()" style="margin-top:8px; font-size:0.82rem; background:none; border:none; color:var(--primary); text-decoration:underline; cursor:pointer; font-weight:700;">🔄 Sincronizar Tasa BCV vía Internet</button>
       </div>
 
       <!-- LOGO CORPORATIVO -->
@@ -449,7 +449,7 @@
       aplicarLogo();
       actualizarDisplaysTasa();
       actualizarDisplayPeso();
-      obtenerTasaBCVOnline();
+      obtenerTasaBCVOnline(); // Sincroniza al cargar la página
       iniciarMonitoreoInactividad();
       document.getElementById('adm-fecha-ingreso').value = hoyStr;
     });
@@ -532,43 +532,33 @@
       }
     }
 
-    // CONSUMO DIRECTO Y ROBUSTO API BCV
+    // NUEVO CÓDIGO DIRECTO Y FIABLE PARA OBTENER EL DÓLAR BCV (API bcv.today)
     async function obtenerTasaBCVOnline() {
-      const urlDirecta = "https://rates.dolarvzla.com/bcv/current.json";
-      try {
-        let response = await fetch(urlDirecta);
-        if (response.ok) {
-          let data = await response.json();
-          let valor = procesarJSONTasa(data);
-          if (valor) {
-            guardarTasaEnStorage(valor);
-            return;
-          }
-        }
-      } catch (e) {}
+      const btn = document.getElementById('btn-sincronizar');
+      if (btn) btn.innerText = "⏳ Sincronizando...";
 
       try {
-        const urlProxy = "https://api.allorigins.win/get?url=" + encodeURIComponent(urlDirecta);
-        let responseProxy = await fetch(urlProxy);
-        if (responseProxy.ok) {
-          let resData = await responseProxy.json();
-          let data = JSON.parse(resData.contents);
-          let valor = procesarJSONTasa(data);
-          if (valor) {
-            guardarTasaEnStorage(valor);
-            return;
-          }
+        const response = await fetch('https://bcv.today/api/v1/rate.json', { cache: 'no-cache' });
+        
+        if (!response.ok) {
+          throw new Error("HTTP error " + response.status);
         }
-      } catch (err) {}
-    }
 
-    function procesarJSONTasa(data) {
-      if (!data) return null;
-      let num = data.price || data.rate || data.usd || data.bcv || data.dolar || data.valor || data.current;
-      if (num && !isNaN(num) && parseFloat(num) > 0) {
-        return parseFloat(num);
+        const data = await response.json();
+
+        if (data && data.USD && !isNaN(data.USD)) {
+          const valorDolar = parseFloat(data.USD);
+          guardarTasaEnStorage(valorDolar);
+          alert("¡Sincronización exitosa! Tasa BCV: " + valorDolar.toFixed(2) + " Bs/$");
+        } else {
+          throw new Error("Formato de respuesta no válido");
+        }
+      } catch (err) {
+        console.error("Error al obtener BCV:", err);
+        alert("No se pudo obtener la tasa en línea. Comprueba tu conexión a internet.");
+      } finally {
+        if (btn) btn.innerText = "🔄 Sincronizar Tasa BCV vía Internet";
       }
-      return null;
     }
 
     function guardarTasaEnStorage(valor) {
@@ -582,7 +572,7 @@
       let val = parseFloat(document.getElementById('adm-tasa').value);
       if (val && val > 0) {
         guardarTasaEnStorage(val);
-        alert("Tasa BCV actualizada a: " + val.toFixed(2) + " Bs/$");
+        alert("Tasa BCV actualizada manualmente a: " + val.toFixed(2) + " Bs/$");
       }
     }
 
