@@ -153,6 +153,19 @@
     .card-producto .precio-usd { color: var(--primary); font-weight: 800; font-size: 1.05rem; }
     .card-producto .precio-bs { color: #64748b; font-weight: 600; font-size: 0.85rem; margin-top: 2px; }
 
+    /* ETIQUETAS DE OFERTA Y CADUCIDAD */
+    .badge-oferta {
+      position: absolute; top: 8px; right: 8px; background: #e76f51; color: white;
+      font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(231,111,81,0.4); text-transform: uppercase;
+    }
+    .badge-remate {
+      position: absolute; top: 8px; right: 8px; background: #d90429; color: white;
+      font-size: 0.68rem; font-weight: 800; padding: 3px 8px; border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(217,4,41,0.5); text-transform: uppercase; animation: pulseGlow 1.5s infinite;
+    }
+    .precio-tachado { text-decoration: line-through; color: #94a3b8; font-size: 0.82rem; }
+
     /* CARRITO FLOTANTE */
     .btn-carrito-flotante {
       position: fixed; bottom: 25px; right: 25px; 
@@ -298,6 +311,8 @@
       <h2 id="modal-prod-nombre" style="color: var(--primary-dark); font-weight:800;">Producto</h2>
       <img id="modal-prod-img" src="" style="width: 140px; height: 140px; border-radius: 18px; margin: 12px 0; object-fit: cover; box-shadow:0 6px 15px rgba(0,0,0,0.1);">
       <p style="font-size: 1.1rem; color:#475569;">Peso registrado: <b id="modal-peso" style="color:#0f172a;">0</b> g</p>
+      
+      <div id="modal-descuento-info" style="font-size:0.85rem; font-weight:700; color:#e76f51; margin-top:4px;"></div>
 
       <div style="background: var(--accent); padding: 12px; border-radius: 16px; margin: 12px 0;">
         <div style="font-size: 1.7rem; color: var(--primary-dark); font-weight:800;">$<span id="modal-subtotal-usd">0.00</span></div>
@@ -333,16 +348,19 @@
   <div class="modal" id="modal-ticket">
     <div class="modal-contenido" style="text-align: center;">
       <h2 style="color:var(--primary-dark); font-weight:800;">¡Ticket Generado!</h2>
-      <p style="font-size: 0.88rem; color: #64748b; margin-top:2px;">Tómale una foto a la pantalla o muestra el QR en caja.</p>
+      <p style="font-size: 0.88rem; color: #64748b; margin-top:2px;">Tómale una foto a la pantalla o imprime tu comanda.</p>
       
       <div class="ticket-impresion" id="contenido-ticket"></div>
       
       <!-- CÓDIGO QR -->
       <div id="qrcode"></div>
 
-      <div style="display: flex; gap: 10px; margin-top: 15px;">
-        <button class="btn-action" onclick="repetirPesaje()" style="flex:1; background:var(--orange); color:white;">🔄 Pesar Otro</button>
-        <button class="btn-action" onclick="reiniciarTodo()" style="flex:1; background:var(--primary); color:white;">Aceptar y Salir</button>
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 15px;">
+        <button class="btn-action" onclick="imprimirTicketBluetooth()" style="background:#2563eb; color:white;">🖨️ Imprimir Ticket (Bluetooth)</button>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn-action" onclick="repetirPesaje()" style="flex:1; background:var(--orange); color:white;">🔄 Pesar Otro</button>
+          <button class="btn-action" onclick="reiniciarTodo()" style="flex:1; background:var(--primary); color:white;">Aceptar y Salir</button>
+        </div>
       </div>
     </div>
   </div>
@@ -369,10 +387,10 @@
         <button class="btn-action" onclick="actualizarLogo()" style="width:100%; background:#e2e8f0; color:#334155; padding:8px;">Cambiar Logo</button>
       </div>
 
-      <!-- AGREGAR PRODUCTO -->
+      <!-- AGREGAR PRODUCTO CON CONTROL DE CADUCIDAD -->
       <div style="background:#f8fafc; padding:12px; border-radius:14px; margin-bottom:12px; border:1px solid #e2e8f0;">
         <h4 style="margin-bottom:6px; color:#1e293b;">🍎 Agregar Nuevo Producto</h4>
-        <input type="text" id="adm-nombre" placeholder="Nombre (ej. Almendras)" style="width:100%; padding:8px; margin-bottom:6px; border-radius:10px; border:1px solid #cbd5e1;">
+        <input type="text" id="adm-nombre" placeholder="Nombre (ej. Fresa de Montaña)" style="width:100%; padding:8px; margin-bottom:6px; border-radius:10px; border:1px solid #cbd5e1;">
         
         <select id="adm-categoria" style="width:100%; padding:8px; margin-bottom:6px; border-radius:10px; border:1px solid #cbd5e1; background:white;">
           <option value="Frutería">Frutería</option>
@@ -383,6 +401,13 @@
         </select>
 
         <input type="number" step="0.01" id="adm-precio" placeholder="Precio $ por Kg" style="width:100%; padding:8px; margin-bottom:6px; border-radius:10px; border:1px solid #cbd5e1;">
+        
+        <label style="font-size:0.8rem; font-weight:700; color:#475569; display:block; margin-bottom:2px;">📅 Días de vida útil (Perecibilidad):</label>
+        <input type="number" id="adm-dias-vida" placeholder="Ej: 3 (Fresa) ó 10 (Papa)" value="5" style="width:100%; padding:8px; margin-bottom:6px; border-radius:10px; border:1px solid #cbd5e1;">
+
+        <label style="font-size:0.8rem; font-weight:700; color:#475569; display:block; margin-bottom:2px;">📦 Fecha de Ingreso del Lote:</label>
+        <input type="date" id="adm-fecha-ingreso" style="width:100%; padding:8px; margin-bottom:6px; border-radius:10px; border:1px solid #cbd5e1;">
+
         <input type="text" id="adm-img" placeholder="URL Imagen (https://...)" style="width:100%; padding:8px; margin-bottom:8px; border-radius:10px; border:1px solid #cbd5e1;">
         <button class="btn-action" onclick="guardarProductoAdmin()" style="width:100%; background:var(--primary); color:white; padding:9px;">Guardar Producto</button>
       </div>
@@ -409,15 +434,19 @@
     let productoTemp = null;
     let categoriaSeleccionada = "";
     let temporizadorInactividad = null;
+    let datosUltimoTicket = null;
+
+    // FECHA HOY FORMATO YYYY-MM-DD
+    const hoyStr = new Date().toISOString().split('T')[0];
 
     let productosPredeterminados = [
-      { id: 1, nombre: 'Manzana Red', categoria: 'Frutería', precioKg: 2.50, img: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300' },
-      { id: 2, nombre: 'Cambur / Banana', categoria: 'Frutería', precioKg: 1.20, img: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300' },
-      { id: 3, nombre: 'Zanahoria', categoria: 'Verdulería', precioKg: 1.80, img: 'https://images.unsplash.com/photo-1598170845058-12ef4a457939?w=300' },
-      { id: 4, nombre: 'Tomate', categoria: 'Verdulería', precioKg: 3.00, img: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=300' },
-      { id: 5, nombre: 'Maní Salado', categoria: 'Manicería', precioKg: 4.00, img: 'https://images.unsplash.com/photo-1567892568620-80d8591325d7?w=300' },
-      { id: 6, nombre: 'Caraotas Negras', categoria: 'Granos', precioKg: 2.20, img: 'https://images.unsplash.com/photo-1551462147-ff29053bfc14?w=300' },
-      { id: 7, nombre: 'Queso Paisa', categoria: 'Charcutería', precioKg: 6.50, img: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=300' }
+      { id: 1, nombre: 'Manzana Red', categoria: 'Frutería', precioKg: 2.50, diasVida: 7, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300' },
+      { id: 2, nombre: 'Cambur / Banana', categoria: 'Frutería', precioKg: 1.20, diasVida: 3, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300' },
+      { id: 3, nombre: 'Zanahoria', categoria: 'Verdulería', precioKg: 1.80, diasVida: 8, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1598170845058-12ef4a457939?w=300' },
+      { id: 4, nombre: 'Tomate', categoria: 'Verdulería', precioKg: 3.00, diasVida: 4, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=300' },
+      { id: 5, nombre: 'Maní Salado', categoria: 'Manicería', precioKg: 4.00, diasVida: 30, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1567892568620-80d8591325d7?w=300' },
+      { id: 6, nombre: 'Caraotas Negras', categoria: 'Granos', precioKg: 2.20, diasVida: 60, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1551462147-ff29053bfc14?w=300' },
+      { id: 7, nombre: 'Queso Paisa', categoria: 'Charcutería', precioKg: 6.50, diasVida: 10, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=300' }
     ];
 
     let productos = JSON.parse(localStorage.getItem('bascula_productos')) || productosPredeterminados;
@@ -428,7 +457,31 @@
       actualizarDisplayPeso();
       obtenerTasaBCVOnline();
       iniciarMonitoreoInactividad();
+      document.getElementById('adm-fecha-ingreso').value = hoyStr;
     });
+
+    // CÁLCULO DE CADUCIDAD Y OFERTA POR MERMA
+    function calcularEstadoOferta(p) {
+      if (!p.fechaIngreso || !p.diasVida) return { descuento: 0, etiqueta: '', precioFinal: p.precioKg };
+
+      const fIngreso = new Date(p.fechaIngreso);
+      const fHoy = new Date();
+      
+      // Diferencia en días transcurridos
+      const diffTiempo = Math.abs(fHoy - fIngreso);
+      const diasTranscurridos = Math.floor(diffTiempo / (1000 * 60 * 60 * 24));
+      const diasRestantes = p.diasVida - diasTranscurridos;
+
+      if (diasRestantes <= 0) {
+        // Día límite o vencido: REMATE -50%
+        return { descuento: 50, etiqueta: 'REMATE -50%', precioFinal: p.precioKg * 0.50 };
+      } else if (diasRestantes === 1) {
+        // 1 día para vencimiento: OFERTA -20%
+        return { descuento: 20, etiqueta: 'OFERTA -20%', precioFinal: p.precioKg * 0.80 };
+      }
+      
+      return { descuento: 0, etiqueta: '', precioFinal: p.precioKg };
+    }
 
     // TEMPORIZADOR DE INACTIVIDAD (60 Segundos)
     function iniciarMonitoreoInactividad() {
@@ -595,15 +648,33 @@
       }
 
       lista.forEach(p => {
-        let precioBs = p.precioKg * tasaBCV;
+        const estadoOferta = calcularEstadoOferta(p);
+        let precioEfectivo = estadoOferta.precioFinal;
+        let precioBs = precioEfectivo * tasaBCV;
+
+        let badgeHtml = '';
+        let precioHtml = '';
+
+        if (estadoOferta.descuento > 0) {
+          let claseBadge = estadoOferta.descuento === 50 ? 'badge-remate' : 'badge-oferta';
+          badgeHtml = `<div class="${claseBadge}">${estadoOferta.etiqueta}</div>`;
+          precioHtml = `
+            <div class="precio-usd">$${precioEfectivo.toFixed(2)} <small class="precio-tachado">$${p.precioKg.toFixed(2)}</small></div>
+            <div class="precio-bs">Bs. ${precioBs.toFixed(2)} /kg</div>
+          `;
+        } else {
+          precioHtml = `
+            <div class="precio-usd">$${p.precioKg.toFixed(2)} /kg</div>
+            <div class="precio-bs">Bs. ${precioBs.toFixed(2)} /kg</div>
+          `;
+        }
+
         grid.innerHTML += `
           <div class="card-producto" onclick="seleccionarProducto(${p.id})">
+            ${badgeHtml}
             <img id="img-prod-${p.id}" src="${p.img}" alt="${p.nombre}" onerror="this.src='https://via.placeholder.com/200?text=Producto'">
             <h4>${p.nombre}</h4>
-            <div>
-              <div class="precio-usd">$${p.precioKg.toFixed(2)} /kg</div>
-              <div class="precio-bs">Bs. ${precioBs.toFixed(2)} /kg</div>
-            </div>
+            <div>${precioHtml}</div>
           </div>
         `;
       });
@@ -615,12 +686,21 @@
         alert("Atención: El peso actual está en 0 g. Toca la balanza verde superior para colocar peso simulado o conectar por Bluetooth.");
       }
       productoTemp = productos.find(p => p.id === id);
-      const subtotalUsd = (pesoNeto / 1000) * productoTemp.precioKg;
+      const estadoOferta = calcularEstadoOferta(productoTemp);
+      
+      const subtotalUsd = (pesoNeto / 1000) * estadoOferta.precioFinal;
       const subtotalBs = subtotalUsd * tasaBCV;
       
       document.getElementById('modal-prod-nombre').innerText = productoTemp.nombre;
       document.getElementById('modal-prod-img').src = productoTemp.img;
       document.getElementById('modal-peso').innerText = pesoNeto;
+      
+      if (estadoOferta.descuento > 0) {
+        document.getElementById('modal-descuento-info').innerText = `🔥 Aplicado Descuento de Lote: ${estadoOferta.etiqueta}`;
+      } else {
+        document.getElementById('modal-descuento-info').innerText = '';
+      }
+
       document.getElementById('modal-subtotal-usd').innerText = subtotalUsd.toFixed(2);
       document.getElementById('modal-subtotal-bs').innerText = subtotalBs.toFixed(2);
       
@@ -629,11 +709,12 @@
 
     function confirmarAgregar(e) {
       let pesoNeto = obtenerPesoNeto();
-      const subtotalUsd = (pesoNeto / 1000) * productoTemp.precioKg;
+      const estadoOferta = calcularEstadoOferta(productoTemp);
+      const subtotalUsd = (pesoNeto / 1000) * estadoOferta.precioFinal;
       const subtotalBs = subtotalUsd * tasaBCV;
 
       carrito.push({
-        nombre: productoTemp.nombre,
+        nombre: productoTemp.nombre + (estadoOferta.descuento > 0 ? ` (${estadoOferta.etiqueta})` : ''),
         peso: pesoNeto,
         subtotalUsd: subtotalUsd,
         subtotalBs: subtotalBs
@@ -734,6 +815,13 @@
       let totalUsd = 0;
       let totalBs = 0;
 
+      datosUltimoTicket = {
+        serial: numSerial,
+        fecha: fechaHora,
+        tasa: tasaBCV,
+        items: [...carrito]
+      };
+
       let html = `
         <div style="text-align:center; margin-bottom:8px;">
           <b>BÁSCULA INTELIGENTE POS</b><br>
@@ -752,6 +840,9 @@
           $${item.subtotalUsd.toFixed(2)} | Bs. ${item.subtotalBs.toFixed(2)}<br>
         `;
       });
+
+      datosUltimoTicket.totalUsd = totalUsd;
+      datosUltimoTicket.totalBs = totalBs;
 
       html += `
         ----------------------------------<br>
@@ -773,6 +864,67 @@
       abrirModal('modal-ticket');
     }
 
+    // IMPRESIÓN DIRECTA IMPRESORA TÉRMICA 58MM VÍA WEB BLUETOOTH ESC/POS
+    async function imprimirTicketBluetooth() {
+      if (!datosUltimoTicket) {
+        alert("No hay ticket activo para imprimir.");
+        return;
+      }
+
+      if (!navigator.bluetooth) {
+        alert("Tu navegador o tablet no soporta la API Web Bluetooth. Asegúrate de usar Chrome o Edge con Bluetooth activado.");
+        return;
+      }
+
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '0000e025-0000-1000-8000-00805f9b34fb']
+        });
+
+        const server = await device.gatt.connect();
+        
+        let service;
+        try {
+          service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+        } catch(e) {
+          service = await server.getPrimaryService('0000e025-0000-1000-8000-00805f9b34fb');
+        }
+
+        const characteristics = await service.getCharacteristics();
+        const characteristic = characteristics[0];
+
+        // Construcción del Ticket en Formato Texto ESC/POS
+        let texto = `================================\n`;
+        texto += `        FRUTERIA POS        \n`;
+        texto += `================================\n`;
+        texto += `FECHA: ${datosUltimoTicket.fecha}\n`;
+        texto += `SERIAL: ${datosUltimoTicket.serial}\n`;
+        texto += `TASA BCV: ${datosUltimoTicket.tasa.toFixed(2)} Bs/$\n`;
+        texto += `--------------------------------\n`;
+
+        datosUltimoTicket.items.forEach(item => {
+          texto += `${item.nombre}\n`;
+          texto += `PESO: ${item.peso}g  SUB: $${item.subtotalUsd.toFixed(2)}\n`;
+          texto += `BS: ${item.subtotalBs.toFixed(2)} BS\n`;
+          texto += `--------------------------------\n`;
+        });
+
+        texto += `TOTAL USD: $${datosUltimoTicket.totalUsd.toFixed(2)}\n`;
+        texto += `TOTAL BS:  Bs. ${datosUltimoTicket.totalBs.toFixed(2)}\n`;
+        texto += `================================\n`;
+        texto += `   ¡GRACIAS POR SU COMPRA!\n\n\n\n`;
+
+        const encoder = new TextEncoder();
+        await characteristic.writeValue(encoder.encode(texto));
+
+        alert("¡Ticket enviado a la impresora Bluetooth con éxito!");
+
+      } catch (err) {
+        alert("Atención al conectar la impresora: " + err.message);
+      }
+    }
+
     function repetirPesaje() {
       cerrarModal('modal-ticket');
     }
@@ -780,6 +932,7 @@
     function reiniciarTodo() {
       carrito = [];
       taraGramos = 0;
+      datosUltimoTicket = null;
       actualizarCarritoBadge();
       cerrarModal('modal-ticket');
       cerrarModal('modal-carrito');
@@ -838,12 +991,14 @@
       const nombre = document.getElementById('adm-nombre').value;
       const categoria = document.getElementById('adm-categoria').value;
       const precio = parseFloat(document.getElementById('adm-precio').value);
+      const diasVida = parseInt(document.getElementById('adm-dias-vida').value) || 5;
+      const fechaIngreso = document.getElementById('adm-fecha-ingreso').value || hoyStr;
       const img = document.getElementById('adm-img').value || 'https://via.placeholder.com/200?text=Producto';
 
       if (nombre && precio) {
-        productos.push({ id: Date.now(), nombre, categoria, precioKg: precio, img });
+        productos.push({ id: Date.now(), nombre, categoria, precioKg: precio, diasVida, fechaIngreso, img });
         localStorage.setItem('bascula_productos', JSON.stringify(productos));
-        alert("Producto guardado exitosamente en " + categoria + ".");
+        alert("Producto guardado exitosamente en " + categoria + " con " + diasVida + " días de vida útil.");
         
         document.getElementById('adm-nombre').value = '';
         document.getElementById('adm-precio').value = '';
