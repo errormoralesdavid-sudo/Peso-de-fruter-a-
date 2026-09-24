@@ -46,12 +46,6 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    @keyframes popIn {
-      0% { opacity: 0; transform: scale(0.85); }
-      70% { transform: scale(1.03); }
-      100% { opacity: 1; transform: scale(1); }
-    }
-
     @keyframes pulseGlow {
       0% { box-shadow: 0 0 0 0 rgba(82, 183, 136, 0.5); }
       70% { box-shadow: 0 0 0 14px rgba(82, 183, 136, 0); }
@@ -457,7 +451,7 @@
   </div>
 
   <script>
-    // PERSISTENCIA Y VARIABLES
+    // PERSISTENCIA Y VARIABLES GLOBAL
     let tasaBCV = parseFloat(localStorage.getItem('bascula_tasa_bcv')) || 36.50;
     let claveAdmin = localStorage.getItem('bascula_clave_admin') || "1234";
     let logoUrl = localStorage.getItem('bascula_logo_url') || "https://cdn-icons-png.flaticon.com/512/1046/1046857.png";
@@ -473,11 +467,16 @@
     // REGISTRO LOCAL DE VENTAS PARA REPORTES
     let ventasHistorial = JSON.parse(localStorage.getItem('bascula_ventas_historial')) || [];
 
-    // AUDIO SINTETIZADO
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // AUDIO SINTETIZADO CON MANEJO DE ESTADO
+    let audioCtx = null;
     
     function reproducirSonido(tipo) {
-      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.connect(gain);
@@ -652,15 +651,26 @@
       const btn = document.getElementById('btn-sincronizar');
       if (btn) btn.innerText = "⏳ Sincronizando...";
       try {
-        const response = await fetch('https://bcv.today/api/v1/rate.json', { cache: 'no-cache' });
+        const response = await fetch('https://rates.dolarvzla.com/bcv/current.json', { cache: 'no-cache' });
         if (!response.ok) throw new Error("HTTP error " + response.status);
         const data = await response.json();
-        if (data && data.USD && !isNaN(data.USD)) {
-          guardarTasaEnStorage(parseFloat(data.USD));
-          alert("¡Sincronización exitosa! Tasa BCV: " + parseFloat(data.USD).toFixed(2) + " Bs/$");
+        const tasa = parseFloat(data.price || data.rate || data.USD);
+        if (tasa && !isNaN(tasa)) {
+          guardarTasaEnStorage(tasa);
+          alert("¡Sincronización exitosa! Tasa BCV: " + tasa.toFixed(2) + " Bs/$");
         }
       } catch (err) {
-        alert("No se pudo sincronizar en línea. Verifica tu conexión.");
+        console.warn("No se pudo obtener la tasa desde la API de producción, intentando con respaldo alternativo...", err);
+        try {
+          const resFallback = await fetch('https://bcv.today/api/v1/rate.json', { cache: 'no-cache' });
+          const dataFb = await resFallback.json();
+          if (dataFb && dataFb.USD && !isNaN(dataFb.USD)) {
+            guardarTasaEnStorage(parseFloat(dataFb.USD));
+            alert("Sincronizado vía servidor de respaldo. Tasa BCV: " + parseFloat(dataFb.USD).toFixed(2) + " Bs/$");
+          }
+        } catch (e) {
+          alert("No se pudo sincronizar en línea. Verifica tu conexión.");
+        }
       } finally {
         if (btn) btn.innerText = "🔄 Sincronizar Tasa BCV vía Internet";
       }
