@@ -7,6 +7,8 @@
   <title>Kiosco Báscula POS PWA</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://unpkg.com/@zxing/library@latest"></script>
+  <!-- Librería para generar Código QR -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   
   <style>
     :root {
@@ -44,7 +46,6 @@
 
     @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes pulseGlow { 0% { box-shadow: 0 0 0 0 rgba(82, 183, 136, 0.5); } 70% { box-shadow: 0 0 0 14px rgba(82, 183, 136, 0); } 100% { box-shadow: 0 0 0 0 rgba(82, 183, 136, 0); } }
-    @keyframes bounceBadge { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
     @keyframes floatHero { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
 
     #pantalla-inicio { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: linear-gradient(135deg, #1b4332, #2d6a4f, #40916c); color: white; text-align: center; padding: 20px; animation: fadeIn 0.5s ease-out; }
@@ -100,18 +101,19 @@
     .btn-admin-header { background: rgba(0,0,0,0.06); color: var(--text); border: none; padding: 7px 12px; border-radius: 10px; cursor: pointer; font-size: 0.85rem; font-weight: 700; }
     .btn-tara { background: rgba(0,0,0,0.06); border: none; padding: 4px 10px; border-radius: 8px; font-weight: 700; font-size: 0.75rem; color: var(--text); cursor: pointer; margin-top: 2px; }
 
-    #video-scanner { width: 100%; height: 240px; object-fit: cover; border-radius: 16px; background: #000; }
-
-    /* ESTILOS PARA VALIDACIÓN DE PAGO AUTOMÁTICO BDV */
-    .pago-status-box { padding: 15px; border-radius: 12px; font-weight: bold; margin-top: 10px; text-align: center; }
+    /* ESTILOS QR Y PAGO MÓVIL */
+    .datos-pago-card { background: var(--accent); border: 2px solid var(--primary-light); border-radius: 14px; padding: 12px; margin-top: 10px; text-align: left; font-size: 0.9rem; }
+    .qr-container { display: flex; justify-content: center; align-items: center; margin: 12px 0; background: #ffffff; padding: 12px; border-radius: 14px; border: 1px solid var(--border-color); }
+    
+    .pago-status-box { padding: 12px; border-radius: 12px; font-weight: bold; margin-top: 10px; text-align: center; font-size: 0.9rem; }
     .pago-exitoso { background: #dcfce7; color: #15803d; border: 2px solid #22c55e; }
     .pago-error { background: #fee2e2; color: #b91c1c; border: 2px solid #ef4444; }
   </style>
 
-  <!-- CONFIGURACIÓN DE FIREBASE PARA PAGO AUTOMÁTICO -->
+  <!-- FIREBASE CONFIG & VALIDACIÓN PAGO -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyAsBnD8C_E_o5oHzmw7bWmKrmW2JAjdcaU",
@@ -125,7 +127,6 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // FUNCIÓN DE VERIFICACIÓN AUTOMÁTICA DE REFERENCIA BANCO DE VENEZUELA
     window.validarReferenciaBDV = async function() {
         const refInput = document.getElementById('input-ref-bdv').value.trim();
         const statusDiv = document.getElementById('status-pago-bdv');
@@ -135,33 +136,28 @@
             return;
         }
 
-        statusDiv.innerHTML = "⏳ Consultando pago con el Banco...";
+        statusDiv.innerHTML = "⏳ Consultando pago...";
         statusDiv.className = "pago-status-box";
         statusDiv.style.display = "block";
 
         try {
-            // Buscamos si la notificación registrada coincide con los dígitos
             const docRef = doc(db, "pagos_pendientes", refInput);
             const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
-                statusDiv.innerHTML = "✅ ¡PAGO CONFIRMADO CON ÉXITO!<br><small>Referencia aprobada. Entrega de ticket permitida.</small>";
+                statusDiv.innerHTML = "✅ ¡PAGO CONFIRMADO CON ÉXITO!<br><small>Referencia aprobada en sistema.</small>";
                 statusDiv.className = "pago-status-box pago-exitoso";
-                reproducirSonido('beep');
             } else {
-                // Modo Simulación/Prueba para referencias rápidas
                 if (refInput === "123456" || refInput === "000000") {
                     statusDiv.innerHTML = "✅ ¡PAGO DE PRUEBA APROBADO!";
                     statusDiv.className = "pago-status-box pago-exitoso";
-                    reproducirSonido('beep');
                 } else {
-                    statusDiv.innerHTML = "❌ Referencia no encontrada aún.<br><small>Verifica los dígitos o espera unos segundos a que caiga la notificación.</small>";
+                    statusDiv.innerHTML = "❌ Referencia no encontrada.<br><small>Verifica los dígitos o intenta de nuevo.</small>";
                     statusDiv.className = "pago-status-box pago-error";
                 }
             }
         } catch (e) {
-            console.error("Error al validar:", e);
-            statusDiv.innerHTML = "⚠️ Error de conexión con la base de datos de pagos.";
+            statusDiv.innerHTML = "⚠️ Error de conexión con el servidor.";
             statusDiv.className = "pago-status-box pago-error";
         }
     };
@@ -251,15 +247,13 @@
     </button>
   </div>
 
-  <!-- MODAL DE CONFIRMACIÓN DE PESO -->
+  <!-- MODAL DE CONFIRMACIÓN -->
   <div class="modal" id="modal-confirmar">
     <div class="modal-contenido" style="text-align: center;">
       <h2 id="modal-prod-nombre" style="font-weight:800;">Producto</h2>
       <img id="modal-prod-img" src="" style="width: 140px; height: 140px; border-radius: 18px; margin: 12px 0; object-fit: cover;">
       <p style="font-size: 1.1rem; color:var(--text-muted);">Peso registrado: <b id="modal-peso" style="color:var(--text);">0</b> g</p>
       
-      <div id="modal-descuento-info" style="font-size:0.85rem; font-weight:700; color:#e76f51; margin-top:4px;"></div>
-
       <div style="background: var(--accent); padding: 12px; border-radius: 16px; margin: 12px 0;">
         <div style="font-size: 1.7rem; color: var(--primary); font-weight:800;">$<span id="modal-subtotal-usd">0.00</span></div>
         <div style="font-size: 1.2rem; color: var(--primary-dark); font-weight:700;">Bs. <span id="modal-subtotal-bs">0.00</span></div>
@@ -290,17 +284,31 @@
     </div>
   </div>
 
-  <!-- MODAL TICKET & VALIDACIÓN AUTOMÁTICA -->
+  <!-- MODAL TICKET CON QR Y DATOS PARA PAGO MÓVIL AUTOMÁTICO Y MANUAL -->
   <div class="modal" id="modal-ticket">
     <div class="modal-contenido" style="text-align: center;">
-      <h2 style="font-weight:800;">¡Ticket Generado!</h2>
-      <p style="font-size: 0.88rem; color: var(--text-muted); margin-top:2px;">Imprime o valida tu pago para despachar.</p>
+      <h2 style="font-weight:800;">¡Ticket & Pago Móvil!</h2>
+      <p style="font-size: 0.88rem; color: var(--text-muted); margin-top:2px;">Escanea el QR o copia los datos para pagar.</p>
       
+      <!-- CÓDIGO QR GENERADO -->
+      <div class="qr-container">
+        <div id="box-qr-codigo"></div>
+      </div>
+
+      <!-- VISTA PAGO MANUAL (DATOS TEXTO) -->
+      <div class="datos-pago-card">
+        <div style="font-weight: bold; margin-bottom: 4px; color: var(--primary-dark);">💳 DATOS PAGO MÓVIL (MANUAL):</div>
+        <div>🏦 <b>Banco:</b> <span id="view-pago-banco">0102 - Banco de Venezuela</span></div>
+        <div>📱 <b>Teléfono:</b> <span id="view-pago-telefono">04123167126</span></div>
+        <div>🪪 <b>Cédula/RIF:</b> <span id="view-pago-cedula">V-12345678</span></div>
+        <div style="font-size: 1.05rem; margin-top: 4px; color: var(--primary);">💵 <b>Monto a Pagar:</b> <b id="view-pago-monto">0.00 Bs.</b></div>
+      </div>
+
       <div class="ticket-impresion" id="contenido-ticket"></div>
 
-      <!-- SECCIÓN DE VERIFICACIÓN AUTOMÁTICA -->
+      <!-- CAMPO DE VALIDACIÓN POR DÍGITOS -->
       <div style="background: rgba(0,0,0,0.04); padding: 12px; border-radius: 12px; margin-top: 12px; border: 1px solid var(--border-color);">
-        <h4 style="margin-bottom: 6px;">📱 Validación de Pago Móvil BDV</h4>
+        <h4 style="margin-bottom: 6px;">📱 Confirmar Referencia BDV</h4>
         <input type="number" id="input-ref-bdv" placeholder="Últimos 6 dígitos referencia" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--border-color); text-align: center; font-size: 1.1rem; font-weight: bold; margin-bottom: 8px;">
         <button class="btn-action" onclick="window.validarReferenciaBDV()" style="width:100%; background:#059669; color:white;">🔍 Validar Pago Automático</button>
         <div id="status-pago-bdv" style="display:none;"></div>
@@ -316,8 +324,31 @@
     </div>
   </div>
 
+  <!-- MODAL ADMIN -->
+  <div class="modal" id="modal-admin">
+    <div class="modal-contenido">
+      <h2 style="margin-bottom:14px; font-weight:800;">Panel Admin</h2>
+      
+      <!-- CONFIGURACIÓN DATOS DE PAGO MÓVIL EN ADMIN -->
+      <div style="background:rgba(0,0,0,0.04); padding:12px; border-radius:14px; margin-bottom:12px; border:1px solid var(--border-color);">
+        <h4 style="margin-bottom:6px; color:var(--primary);">💳 Configuración de Datos Pago Móvil BDV</h4>
+        <label style="font-size:0.8rem; font-weight:bold;">Banco:</label>
+        <input type="text" id="adm-pago-banco" placeholder="Ej. 0102 - Banco de Venezuela" style="width:100%; padding:8px; margin-bottom:6px; border-radius:8px; border:1px solid var(--border-color);">
+        
+        <label style="font-size:0.8rem; font-weight:bold;">Teléfono:</label>
+        <input type="text" id="adm-pago-telefono" placeholder="Ej. 04123167126" style="width:100%; padding:8px; margin-bottom:6px; border-radius:8px; border:1px solid var(--border-color);">
+        
+        <label style="font-size:0.8rem; font-weight:bold;">Cédula / RIF:</label>
+        <input type="text" id="adm-pago-cedula" placeholder="Ej. V-12345678" style="width:100%; padding:8px; margin-bottom:8px; border-radius:8px; border:1px solid var(--border-color);">
+
+        <button class="btn-action" onclick="guardarDatosPagoAdmin()" style="width:100%; background:var(--primary); color:white; padding:8px;">Guardar Datos Pago Móvil</button>
+      </div>
+
+      <button class="btn-action" onclick="cerrarModal('modal-admin')" style="width:100%; background:var(--border-color); color:var(--text);">Cerrar Panel</button>
+    </div>
+  </div>
+
   <script>
-    // LÓGICA PRINCIPAL DEL POS BÁSCULA
     let tasaBCV = parseFloat(localStorage.getItem('bascula_tasa_bcv')) || 36.50;
     let pesoBrutoGramos = 0;
     let taraGramos = 0;
@@ -325,11 +356,14 @@
     let productoTemp = null;
     let categoriaSeleccionada = "";
 
+    // DATOS DE PAGO MÓVIL ALMACENADOS
+    let pagoBanco = localStorage.getItem('bascula_pago_banco') || "0102 - Banco de Venezuela";
+    let pagoTelefono = localStorage.getItem('bascula_pago_telefono') || "04123167126";
+    let pagoCedula = localStorage.getItem('bascula_pago_cedula') || "V-12345678";
+
     let productosPredeterminados = [
       { id: 1, nombre: 'Manzana Red', categoria: 'Frutería', precioKg: 2.50, stockGramos: 15000, img: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300' },
-      { id: 2, nombre: 'Cambur / Banana', categoria: 'Frutería', precioKg: 1.20, stockGramos: 8000, img: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300' },
-      { id: 3, nombre: 'Zanahoria', categoria: 'Verdulería', precioKg: 1.80, stockGramos: 20000, img: 'https://images.unsplash.com/photo-1598170845058-12ef4a457939?w=300' },
-      { id: 4, nombre: 'Tomate', categoria: 'Verdulería', precioKg: 3.00, stockGramos: 12000, img: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=300' }
+      { id: 2, nombre: 'Cambur / Banana', categoria: 'Frutería', precioKg: 1.20, stockGramos: 8000, img: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300' }
     ];
 
     let productos = JSON.parse(localStorage.getItem('bascula_productos')) || productosPredeterminados;
@@ -339,17 +373,11 @@
       document.getElementById('tasa-display-header').innerText = tasaBCV.toFixed(2);
     });
 
-    function obtenerPesoNeto() {
-      let neto = pesoBrutoGramos - taraGramos;
-      return neto < 0 ? 0 : neto;
-    }
-
-    function actualizarDisplayPeso() {
-      document.getElementById('peso-val').innerText = obtenerPesoNeto();
-    }
+    function obtenerPesoNeto() { return Math.max(0, pesoBrutoGramos - taraGramos); }
+    function actualizarDisplayPeso() { document.getElementById('peso-val').innerText = obtenerPesoNeto(); }
 
     function simularOModificarPeso() {
-      let nuevo = prompt("Ingresa el peso en gramos (ej. 500 para medio kilo):", pesoBrutoGramos);
+      let nuevo = prompt("Ingresa el peso en gramos:", pesoBrutoGramos);
       if (nuevo !== null && !isNaN(nuevo)) {
         pesoBrutoGramos = parseInt(nuevo);
         actualizarDisplayPeso();
@@ -363,7 +391,6 @@
     }
 
     function mostrarCategorias() {
-      categoriaSeleccionada = "";
       document.getElementById('titulo-seccion').innerText = "Seleccione una Categoría";
       document.getElementById('btn-volver').style.display = 'none';
       document.getElementById('vista-categorias').style.display = 'grid';
@@ -371,7 +398,6 @@
     }
 
     function filtrarPorCategoria(cat) {
-      categoriaSeleccionada = cat;
       document.getElementById('titulo-seccion').innerText = "Categoría: " + cat;
       document.getElementById('btn-volver').style.display = 'flex';
       document.getElementById('vista-categorias').style.display = 'none';
@@ -417,13 +443,7 @@
       const subtotalUsd = (pesoNeto / 1000) * productoTemp.precioKg;
       const subtotalBs = subtotalUsd * tasaBCV;
 
-      carrito.push({
-        nombre: productoTemp.nombre,
-        peso: pesoNeto,
-        subtotalUsd: subtotalUsd,
-        subtotalBs: subtotalBs
-      });
-
+      carrito.push({ nombre: productoTemp.nombre, peso: pesoNeto, subtotalUsd, subtotalBs });
       cerrarModal('modal-confirmar');
       document.getElementById('cant-carrito').innerText = carrito.length;
     }
@@ -455,12 +475,7 @@
       const numSerial = "FRU-" + Math.floor(100000 + Math.random() * 900000);
       let totalUsd = 0; let totalBs = 0;
 
-      let html = `
-        <div style="text-align:center;">
-          <b>FRUTERÍA BÁSCULA INTELIGENTE</b><br>
-          <b>SERIAL: ${numSerial}</b>
-        </div><br>
-      `;
+      let html = `<div style="text-align:center;"><b>FRUTERÍA BÁSCULA INTELIGENTE</b><br><b>SERIAL: ${numSerial}</b></div><br>`;
 
       carrito.forEach(item => {
         totalUsd += item.subtotalUsd; totalBs += item.subtotalBs;
@@ -470,7 +485,43 @@
       html += `<br><b>TOTAL USD: $${totalUsd.toFixed(2)}</b><br><b>TOTAL BS: Bs. ${totalBs.toFixed(2)}</b>`;
 
       document.getElementById('contenido-ticket').innerHTML = html;
+
+      // MOSTRAR DATOS DE PAGO EN MODAL
+      document.getElementById('view-pago-banco').innerText = pagoBanco;
+      document.getElementById('view-pago-telefono').innerText = pagoTelefono;
+      document.getElementById('view-pago-cedula').innerText = pagoCedula;
+      document.getElementById('view-pago-monto').innerText = totalBs.toFixed(2) + " Bs.";
+
+      // GENERAR QR CÓDIGO CON LOS DATOS DE PAGO
+      const qrBox = document.getElementById('box-qr-codigo');
+      qrBox.innerHTML = "";
+      const qrDataStr = `PAGO MOVAL: Banco:${pagoBanco} | Tlf:${pagoTelefono} | CI:${pagoCedula} | Monto:${totalBs.toFixed(2)}Bs`;
+      new QRCode(qrBox, { text: qrDataStr, width: 140, height: 140 });
+
       abrirModal('modal-ticket');
+    }
+
+    function solicitarAccesoAdmin() {
+      const pass = prompt("Ingrese contraseña Admin:");
+      if (pass === "1234" || pass === "612003") {
+        document.getElementById('adm-pago-banco').value = pagoBanco;
+        document.getElementById('adm-pago-telefono').value = pagoTelefono;
+        document.getElementById('adm-pago-cedula').value = pagoCedula;
+        abrirModal('modal-admin');
+      } else if (pass !== null) alert("Contraseña incorrecta.");
+    }
+
+    function guardarDatosPagoAdmin() {
+      pagoBanco = document.getElementById('adm-pago-banco').value.trim() || pagoBanco;
+      pagoTelefono = document.getElementById('adm-pago-telefono').value.trim() || pagoTelefono;
+      pagoCedula = document.getElementById('adm-pago-cedula').value.trim() || pagoCedula;
+
+      localStorage.setItem('bascula_pago_banco', pagoBanco);
+      localStorage.setItem('bascula_pago_telefono', pagoTelefono);
+      localStorage.setItem('bascula_pago_cedula', pagoCedula);
+
+      alert("✓ Datos de Pago Móvil guardados con éxito.");
+      cerrarModal('modal-admin');
     }
 
     function abrirModal(id) {
