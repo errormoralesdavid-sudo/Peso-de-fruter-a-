@@ -7,6 +7,11 @@
   <title>Kiosco Báscula POS PWA</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://unpkg.com/@zxing/library@latest"></script>
+  
+  <!-- FIREBASE SDK (COMPAT MODULES) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
   <style>
     :root {
       --primary: #2d6a4f;
@@ -44,6 +49,12 @@
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(12px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.85); }
+      70% { transform: scale(1.03); }
+      100% { opacity: 1; transform: scale(1); }
     }
 
     @keyframes pulseGlow {
@@ -348,6 +359,16 @@
         <div style="font-size: 1.1rem; font-weight:700; color:var(--text-muted);">Bs. <span id="cart-total-bs">0.00</span></div>
       </div>
 
+      <!-- SECCIÓN VALIDACIÓN DE PAGO VIA FIREBASE -->
+      <div style="background: rgba(0,0,0,0.03); padding: 12px; border-radius: 14px; margin-bottom: 15px; border: 1px dashed var(--primary-light);">
+        <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 4px;">🔥 Validación de Pago (Firebase):</label>
+        <div style="display: flex; gap: 6px;">
+          <input type="text" id="ref-pago-input" placeholder="N° Referencia o Comprobante" style="flex:1; padding: 8px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text);">
+          <button class="btn-action" onclick="verificarPagoFirebase()" style="background: #0284c7; color: white; padding: 8px 12px; font-size: 0.85rem;">Validar Ref</button>
+        </div>
+        <div id="status-pago-firebase" style="font-size: 0.8rem; font-weight: 700; margin-top: 5px;"></div>
+      </div>
+
       <div style="display: flex; gap: 10px;">
         <button class="btn-action" onclick="cerrarModal('modal-carrito')" style="flex:1; background:var(--border-color); color:var(--text);">Seguir Pesando</button>
         <button class="btn-action" onclick="generarTicket()" style="flex:1; background:var(--primary); color:white;">Generar Ticket</button>
@@ -451,7 +472,22 @@
   </div>
 
   <script>
-    // PERSISTENCIA Y VARIABLES GLOBAL
+    // INICIALIZACIÓN DE FIREBASE
+    const firebaseConfig = {
+      apiKey: "TU_API_KEY",
+      authDomain: "TU_PROYECTO.firebaseapp.com",
+      projectId: "TU_PROYECTO_ID",
+      storageBucket: "TU_PROYECTO.appspot.com",
+      messagingSenderId: "TU_SENDER_ID",
+      appId: "TU_APP_ID"
+    };
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.firestore();
+
+    // PERSISTENCIA Y VARIABLES
     let tasaBCV = parseFloat(localStorage.getItem('bascula_tasa_bcv')) || 36.50;
     let claveAdmin = localStorage.getItem('bascula_clave_admin') || "1234";
     let logoUrl = localStorage.getItem('bascula_logo_url') || "https://cdn-icons-png.flaticon.com/512/1046/1046857.png";
@@ -463,20 +499,16 @@
     let temporizadorInactividad = null;
     let datosUltimoTicket = null;
     let codeReader = null;
+    let pagoValidadoFirebase = false;
 
     // REGISTRO LOCAL DE VENTAS PARA REPORTES
     let ventasHistorial = JSON.parse(localStorage.getItem('bascula_ventas_historial')) || [];
 
-    // AUDIO SINTETIZADO CON MANEJO DE ESTADO
-    let audioCtx = null;
+    // AUDIO SINTETIZADO (WEB AUDIO API)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     
     function reproducirSonido(tipo) {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.connect(gain);
@@ -494,6 +526,63 @@
         osc.type = 'sine'; osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
         gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
         osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+      } else if (tipo === 'pago_ok') {
+        osc.type = 'sine'; osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+      } else if (tipo === 'pago_error') {
+        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.25);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+      }
+    }
+
+    // VERIFICACIÓN DE PAGO EN FIREBASE FIRESTORE
+    async function verificarPagoFirebase() {
+      const refInput = document.getElementById('ref-pago-input').value.trim();
+      const statusDiv = document.getElementById('status-pago-firebase');
+
+      if (!refInput) {
+        statusDiv.style.color = "#ef4444";
+        statusDiv.innerText = "❌ Ingrese una referencia válida.";
+        reproducirSonido('pago_error');
+        return;
+      }
+
+      statusDiv.style.color = "#0284c7";
+      statusDiv.innerText = "⏳ Verificando en Firebase...";
+
+      try {
+        const snapshot = await db.collection('pagos')
+          .where('referencia', '==', refInput)
+          .get();
+
+        if (!snapshot.empty) {
+          let pago = snapshot.docs[0].data();
+          if (pago.estatus === 'aprobado' || pago.estatus === 'completado' || pago.validado === true) {
+            pagoValidadoFirebase = true;
+            statusDiv.style.color = "#15803d";
+            statusDiv.innerText = `✅ Pago Verificado (${pago.monto ? pago.monto + ' Bs/USD' : 'Aprobado'})`;
+            reproducirSonido('pago_ok');
+          } else {
+            pagoValidadoFirebase = false;
+            statusDiv.style.color = "#b45309";
+            statusDiv.innerText = "⚠️ Pago registrado pero pendiente de aprobación.";
+            reproducirSonido('pago_error');
+          }
+        } else {
+          pagoValidadoFirebase = false;
+          statusDiv.style.color = "#ef4444";
+          statusDiv.innerText = "❌ Referencia no encontrada en la base de datos.";
+          reproducirSonido('pago_error');
+        }
+      } catch (err) {
+        console.error(err);
+        statusDiv.style.color = "#ef4444";
+        statusDiv.innerText = "❌ Error al conectar con Firebase.";
+        reproducirSonido('pago_error');
       }
     }
 
@@ -526,6 +615,7 @@
     });
 
     function toggleModoOscuro() {
+      reproducirSonido('beep');
       document.body.classList.toggle('dark-mode');
       localStorage.setItem('bascula_modo_oscuro', document.body.classList.contains('dark-mode'));
     }
@@ -651,26 +741,15 @@
       const btn = document.getElementById('btn-sincronizar');
       if (btn) btn.innerText = "⏳ Sincronizando...";
       try {
-        const response = await fetch('https://rates.dolarvzla.com/bcv/current.json', { cache: 'no-cache' });
+        const response = await fetch('https://bcv.today/api/v1/rate.json', { cache: 'no-cache' });
         if (!response.ok) throw new Error("HTTP error " + response.status);
         const data = await response.json();
-        const tasa = parseFloat(data.price || data.rate || data.USD);
-        if (tasa && !isNaN(tasa)) {
-          guardarTasaEnStorage(tasa);
-          alert("¡Sincronización exitosa! Tasa BCV: " + tasa.toFixed(2) + " Bs/$");
+        if (data && data.USD && !isNaN(data.USD)) {
+          guardarTasaEnStorage(parseFloat(data.USD));
+          alert("¡Sincronización exitosa! Tasa BCV: " + parseFloat(data.USD).toFixed(2) + " Bs/$");
         }
       } catch (err) {
-        console.warn("No se pudo obtener la tasa desde la API de producción, intentando con respaldo alternativo...", err);
-        try {
-          const resFallback = await fetch('https://bcv.today/api/v1/rate.json', { cache: 'no-cache' });
-          const dataFb = await resFallback.json();
-          if (dataFb && dataFb.USD && !isNaN(dataFb.USD)) {
-            guardarTasaEnStorage(parseFloat(dataFb.USD));
-            alert("Sincronizado vía servidor de respaldo. Tasa BCV: " + parseFloat(dataFb.USD).toFixed(2) + " Bs/$");
-          }
-        } catch (e) {
-          alert("No se pudo sincronizar en línea. Verifica tu conexión.");
-        }
+        alert("No se pudo sincronizar en línea. Verifica tu conexión.");
       } finally {
         if (btn) btn.innerText = "🔄 Sincronizar Tasa BCV vía Internet";
       }
@@ -689,6 +768,7 @@
     }
 
     function iniciarKiosco() {
+      reproducirSonido('beep');
       document.getElementById('pantalla-inicio').style.display = 'none';
       document.getElementById('pantalla-kiosco').style.display = 'flex';
       mostrarCategorias();
@@ -704,6 +784,7 @@
     }
 
     function filtrarPorCategoria(cat) {
+      reproducirSonido('beep');
       categoriaSeleccionada = cat;
       document.getElementById('input-buscar').value = "";
       document.getElementById('titulo-seccion').innerText = "Categoría: " + cat;
@@ -772,6 +853,7 @@
     }
 
     function seleccionarProducto(id) {
+      reproducirSonido('beep');
       let pesoNeto = obtenerPesoNeto();
       productoTemp = productos.find(p => p.id === id);
       
@@ -852,6 +934,7 @@
     }
 
     function abrirCarrito() {
+      reproducirSonido('beep');
       const contenedor = document.getElementById('lista-carrito');
       contenedor.innerHTML = '';
       let totalUsd = 0; let totalBs = 0;
@@ -882,6 +965,7 @@
     }
 
     function eliminarDelCarrito(index) {
+      reproducirSonido('beep');
       carrito.splice(index, 1);
       actualizarCarritoBadge();
       abrirCarrito();
@@ -936,7 +1020,8 @@
         hora: new Date().toLocaleTimeString('es-VE'),
         totalUsd: totalUsd,
         totalBs: totalBs,
-        cantProductos: carrito.length
+        cantProductos: carrito.length,
+        pagoVerificadoFirebase: pagoValidadoFirebase
       });
       localStorage.setItem('bascula_ventas_historial', JSON.stringify(ventasHistorial));
       actualizarReporteAdmin();
@@ -945,11 +1030,13 @@
         ----------------------------------<br>
         <div style="font-size:1.05rem; margin-top:4px;">
           <b>TOTAL USD: $${totalUsd.toFixed(2)}</b><br>
-          <b>TOTAL BS: Bs. ${totalBs.toFixed(2)}</b>
+          <b>TOTAL BS: Bs. ${totalBs.toFixed(2)}</b><br>
+          <small>Estatus Pago: ${pagoValidadoFirebase ? '✅ Verificado (Firebase)' : '⏳ Pendiente / Caja'}</small>
         </div>
       `;
 
       document.getElementById('contenido-ticket').innerHTML = html;
+      reproducirSonido('pago_ok');
       abrirModal('modal-ticket');
     }
 
@@ -966,9 +1053,9 @@
     // EXPORTACIÓN EXCEL / CSV
     function exportarVentasCSV() {
       if (ventasHistorial.length === 0) { alert("No hay ventas registradas para exportar."); return; }
-      let csvContent = "data:text/csv;charset=utf-8,Serial,Fecha,Hora,CantProductos,TotalUSD,TotalBS\n";
+      let csvContent = "data:text/csv;charset=utf-8,Serial,Fecha,Hora,CantProductos,TotalUSD,TotalBS,PagoFirebase\n";
       ventasHistorial.forEach(v => {
-        csvContent += `${v.serial},${v.fecha},${v.hora},${v.cantProductos},${v.totalUsd.toFixed(2)},${v.totalBs.toFixed(2)}\n`;
+        csvContent += `${v.serial},${v.fecha},${v.hora},${v.cantProductos},${v.totalUsd.toFixed(2)},${v.totalBs.toFixed(2)},${v.pagoVerificadoFirebase ? 'SI' : 'NO'}\n`;
       });
       descargarCSV(csvContent, `Ventas_${hoyStr}.csv`);
     }
@@ -1020,7 +1107,7 @@
     function repetirPesaje() { cerrarModal('modal-ticket'); }
 
     function reiniciarTodo() {
-      carrito = []; taraGramos = 0; datosUltimoTicket = null;
+      carrito = []; taraGramos = 0; datosUltimoTicket = null; pagoValidadoFirebase = false;
       actualizarCarritoBadge();
       cerrarModal('modal-ticket'); cerrarModal('modal-carrito'); cerrarModal('modal-confirmar');
       mostrarCategorias();
