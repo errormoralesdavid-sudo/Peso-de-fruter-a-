@@ -550,12 +550,12 @@
 
       try {
         // Opción A: Buscar por ID del documento
-        let docRef = db.collection('pagos_mercantil').doc(refInput);
+        let docRef = db.collection('verificacion_pagos').doc(refInput);
         let docSnap = await docRef.get();
 
         // Opción B: Si no está por ID, hacer búsqueda dentro del campo en fields
         if (!docSnap.exists) {
-          const snapshot = await db.collection('pagos_mercantil')
+          const snapshot = await db.collection('verificacion_pagos')
             .where('fields.referencia_6digitos.stringValue', '==', refInput)
             .get();
 
