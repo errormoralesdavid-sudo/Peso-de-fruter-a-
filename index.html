@@ -7,11 +7,6 @@
   <title>Kiosco Báscula POS PWA</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://unpkg.com/@zxing/library@latest"></script>
-  
-  <!-- FIREBASE SDK (COMPAT MODULES) -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
   <style>
     :root {
       --primary: #2d6a4f;
@@ -220,6 +215,17 @@
 
     #video-scanner { width: 100%; height: 240px; object-fit: cover; border-radius: 16px; background: #000; }
 
+    /* ESTILOS DE AUTOPAGO Y ESTADOS */
+    .seccion-autopago {
+      background: rgba(0,0,0,0.04); padding: 12px; border-radius: 16px; margin: 12px 0; border: 1px solid var(--border-color); text-align: left;
+    }
+    .seccion-autopago label { font-size: 0.82rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px; }
+    .seccion-autopago input { width: 100%; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border-color); font-weight: 700; font-size: 0.95rem; margin-bottom: 8px; background: var(--card-bg); color: var(--text); }
+    #msg-autopago { font-weight: 700; font-size: 0.85rem; margin-top: 6px; }
+    .msg-exito { color: #16a34a; }
+    .msg-error { color: #dc2626; }
+    .msg-cargando { color: #ca8a04; }
+
     input, select { font-size: 0.95rem; }
   </style>
 </head>
@@ -342,30 +348,28 @@
     </div>
   </div>
 
-  <!-- MODAL CARRITO -->
+  <!-- MODAL CARRITO CON AUTOPAGO -->
   <div class="modal" id="modal-carrito">
     <div class="modal-contenido">
       <h2 style="margin-bottom: 12px; font-weight:800;">Su Carrito de Compras</h2>
-      <div id="lista-carrito" style="max-height: 220px; overflow-y: auto; margin: 12px 0; border-top:1px solid var(--border-color); border-bottom:1px solid var(--border-color); padding:10px 0;"></div>
+      <div id="lista-carrito" style="max-height: 180px; overflow-y: auto; margin: 12px 0; border-top:1px solid var(--border-color); border-bottom:1px solid var(--border-color); padding:10px 0;"></div>
       
-      <div style="text-align: right; margin-bottom: 15px;">
+      <div style="text-align: right; margin-bottom: 12px;">
         <div style="font-size: 1.4rem; font-weight:800; color:var(--primary);">Total: $<span id="cart-total-usd">0.00</span></div>
         <div style="font-size: 1.1rem; font-weight:700; color:var(--text-muted);">Bs. <span id="cart-total-bs">0.00</span></div>
       </div>
 
-      <!-- SECCIÓN VALIDACIÓN DE PAGO VIA FIREBASE -->
-      <div style="background: rgba(0,0,0,0.03); padding: 12px; border-radius: 14px; margin-bottom: 15px; border: 1px dashed var(--primary-light);">
-        <label style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 4px;">🔥 Validación de Pago (Firebase):</label>
-        <div style="display: flex; gap: 6px;">
-          <input type="text" id="ref-pago-input" placeholder="N° Referencia o Comprobante" style="flex:1; padding: 8px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text);">
-          <button class="btn-action" onclick="iniciarEscuchaPagoFirebase()" style="background: #0284c7; color: white; padding: 8px 12px; font-size: 0.85rem;">Validar Ref</button>
-        </div>
-        <div id="status-pago-firebase" style="font-size: 0.8rem; font-weight: 700; margin-top: 5px;"></div>
+      <!-- SECCIÓN AUTOPAGO DE PAGO MÓVIL FIRESTORE -->
+      <div class="seccion-autopago">
+        <label for="ref-pago-input">📱 Módulo de Autopago (Pago Móvil Mercantil):</label>
+        <input type="number" id="ref-pago-input" placeholder="Ingresa N° Referencia (ej. 123456)">
+        <button class="btn-action" id="btn-validar-pago" onclick="validarPagoFirestore()" style="width:100%; background:var(--orange); color:white; padding:10px;">Validar Pago Móvil ⚡</button>
+        <div id="msg-autopago"></div>
       </div>
 
-      <div style="display: flex; gap: 10px;">
+      <div style="display: flex; gap: 10px; margin-top:10px;">
         <button class="btn-action" onclick="cerrarModal('modal-carrito')" style="flex:1; background:var(--border-color); color:var(--text);">Seguir Pesando</button>
-        <button class="btn-action" onclick="generarTicket()" style="flex:1; background:var(--primary); color:white;">Generar Ticket</button>
+        <button class="btn-action" onclick="generarTicket()" style="flex:1; background:var(--primary); color:white;">Generar Ticket Solo</button>
       </div>
     </div>
   </div>
@@ -465,41 +469,115 @@
     </div>
   </div>
 
-  <script>
-    // INICIALIZACIÓN DE FIREBASE
+  <!-- FIREBASE FIRESTORE SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
     const firebaseConfig = {
-      apiKey: "TU_API_KEY",
-      authDomain: "TU_PROYECTO.firebaseapp.com",
-      projectId: "TU_PROYECTO_ID",
-      storageBucket: "TU_PROYECTO.appspot.com",
-      messagingSenderId: "TU_SENDER_ID",
-      appId: "TU_APP_ID"
+      apiKey: "AIzaSyAsBnD8C_E_o5oHzmw7bWmKrmW2JAjdcaU",
+      authDomain: "geomercado-9d642.firebaseapp.com",
+      projectId: "geomercado-9d642",
+      storageBucket: "geomercado-9d642.firebasestorage.app",
+      messagingSenderId: "521126834575",
+      appId: "1:521126834575:web:4c847dec3dd57d9a439bfa"
     };
 
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
-    const db = firebase.firestore();
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
+    // Función Global para Autopago
+    window.validarPagoFirestore = async function() {
+      const refInput = document.getElementById('ref-pago-input').value.trim();
+      const msgDiv = document.getElementById('msg-autopago');
+      const btnValidar = document.getElementById('btn-validar-pago');
+
+      if (!refInput) {
+        msgDiv.className = "msg-error";
+        msgDiv.innerText = "❌ Por favor ingresa el número de referencia.";
+        return;
+      }
+
+      if (window.carrito.length === 0) {
+        msgDiv.className = "msg-error";
+        msgDiv.innerText = "❌ El carrito está vacío.";
+        return;
+      }
+
+      btnValidar.disabled = true;
+      msgDiv.className = "msg-cargando";
+      msgDiv.innerText = "⏳ Verificando pago con el banco en Firestore...";
+
+      try {
+        const pagosRef = collection(db, "verificacion_pagos");
+        const q = query(pagosRef, where("referencia", "==", refInput));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          let yaProcesado = false;
+
+          for (const docSnap of querySnapshot.docs) {
+            const data = docSnap.data();
+
+            if (data.estado === "PROCESADO") {
+              msgDiv.className = "msg-error";
+              msgDiv.innerText = "⚠️ Esta referencia ya fue utilizada anteriormente.";
+              yaProcesado = true;
+              break;
+            }
+
+            // Marcar pago como consumido en la BD
+            await updateDoc(docSnap.ref, {
+              estado: "PROCESADO",
+              fecha_procesado: new Date().toISOString()
+            });
+          }
+
+          if (!yaProcesado) {
+            msgDiv.className = "msg-exito";
+            msgDiv.innerText = "✅ ¡Pago Confirmado Exitosamente!";
+            window.reproducirSonido('scan');
+
+            setTimeout(() => {
+              window.generarTicket();
+              document.getElementById('ref-pago-input').value = '';
+              msgDiv.innerText = '';
+            }, 1000);
+          }
+
+        } else {
+          msgDiv.className = "msg-error";
+          msgDiv.innerText = "❌ Referencia no encontrada. Verifica el número o espera unos segundos.";
+        }
+      } catch (error) {
+        console.error("Error al consultar Firestore:", error);
+        msgDiv.className = "msg-error";
+        msgDiv.innerText = "❌ Error de conexión al consultar la base de datos.";
+      } finally {
+        btnValidar.disabled = false;
+      }
+    };
+  </script>
+
+  <!-- LÓGICA PRINCIPAL DE LA APP -->
+  <script>
     // PERSISTENCIA Y VARIABLES
     let tasaBCV = parseFloat(localStorage.getItem('bascula_tasa_bcv')) || 36.50;
     let claveAdmin = localStorage.getItem('bascula_clave_admin') || "1234";
     let logoUrl = localStorage.getItem('bascula_logo_url') || "https://cdn-icons-png.flaticon.com/512/1046/1046857.png";
     let pesoBrutoGramos = 0;
     let taraGramos = 0;
-    let carrito = [];
+    window.carrito = [];
     let productoTemp = null;
     let categoriaSeleccionada = "";
     let temporizadorInactividad = null;
     let datosUltimoTicket = null;
     let codeReader = null;
-    let pagoValidadoFirebase = false;
-    let unsubscribePagoListener = null; // Escuchador en tiempo real para Firestore
 
     // REGISTRO LOCAL DE VENTAS PARA REPORTES
     let ventasHistorial = JSON.parse(localStorage.getItem('bascula_ventas_historial')) || [];
 
-    // AUDIO SINTETIZADO (WEB AUDIO API)
+    // AUDIO SINTETIZADO
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     
     function reproducirSonido(tipo) {
@@ -521,72 +599,9 @@
         osc.type = 'sine'; osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
         gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
         osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-      } else if (tipo === 'pago_ok') {
-        osc.type = 'sine'; osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2);
-        gain.gain.setValueAtTime(0.15, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
-      } else if (tipo === 'pago_error') {
-        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(220, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.25);
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
       }
     }
-
-    // VERIFICACIÓN DE PAGO EN FIREBASE FIRESTORE CON ESCUCHA EN TIEMPO REAL (onSnapshot)
-    function iniciarEscuchaPagoFirebase() {
-      const refInput = document.getElementById('ref-pago-input').value.trim();
-      const statusDiv = document.getElementById('status-pago-firebase');
-
-      if (!refInput) {
-        statusDiv.style.color = "#ef4444";
-        statusDiv.innerText = "❌ Ingrese una referencia válida.";
-        reproducirSonido('pago_error');
-        return;
-      }
-
-      // Detener cualquier escucha previa activa
-      if (unsubscribePagoListener) {
-        unsubscribePagoListener();
-        unsubscribePagoListener = null;
-      }
-
-      statusDiv.style.color = "#0284c7";
-      statusDiv.innerText = "⏳ Conectando con Firebase y escuchando cambios...";
-
-      // Escuchador en tiempo real con onSnapshot
-      unsubscribePagoListener = db.collection('verificacion_pagos')
-        .where('referencia_6digitos', '==', refInput)
-        .onSnapshot((snapshot) => {
-          if (!snapshot.empty) {
-            let docSnap = snapshot.docs[0];
-            let data = docSnap.data();
-            let estado = data.estado;
-            let tienda = data.tienda;
-
-            if (estado === 'verificado_banco' || estado === 'aprobado' || estado === 'completado') {
-              pagoValidadoFirebase = true;
-              statusDiv.style.color = "#15803d";
-              statusDiv.innerText = `✅ Pago Verificado (${tienda ? 'Tienda: ' + tienda : 'Aprobado'})`;
-              reproducirSonido('pago_ok');
-            } else {
-              pagoValidadoFirebase = false;
-              statusDiv.style.color = "#b45309";
-              statusDiv.innerText = `⚠️ Estado actual: ${estado || 'Pendiente'}. Esperando confirmación...`;
-            }
-          } else {
-            pagoValidadoFirebase = false;
-            statusDiv.style.color = "#ef4444";
-            statusDiv.innerText = "❌ Referencia no encontrada. Monitoreando si se registra...";
-          }
-        }, (err) => {
-          console.error("Error en tiempo real de Firebase:", err);
-          statusDiv.style.color = "#ef4444";
-          statusDiv.innerText = "❌ Error en conexión de tiempo real con Firebase.";
-          reproducirSonido('pago_error');
-        });
-    }
+    window.reproducirSonido = reproducirSonido;
 
     const hoyStr = new Date().toISOString().split('T')[0];
 
@@ -617,7 +632,6 @@
     });
 
     function toggleModoOscuro() {
-      reproducirSonido('beep');
       document.body.classList.toggle('dark-mode');
       localStorage.setItem('bascula_modo_oscuro', document.body.classList.contains('dark-mode'));
     }
@@ -746,12 +760,12 @@
         const response = await fetch('https://rates.dolarvzla.com/bcv/current.json', { cache: 'no-cache' });
         if (!response.ok) throw new Error("HTTP error " + response.status);
         const data = await response.json();
-        if (data && data.price) {
-          guardarTasaEnStorage(parseFloat(data.price));
-          alert("¡Sincronización exitosa! Tasa BCV: " + parseFloat(data.price).toFixed(2) + " Bs/$");
+        if (data && data.USD && !isNaN(data.USD)) {
+          guardarTasaEnStorage(parseFloat(data.USD));
+          alert("¡Sincronización exitosa! Tasa BCV: " + parseFloat(data.USD).toFixed(2) + " Bs/$");
         }
       } catch (err) {
-        alert("No se pudo sincronizar en línea. Verifica tu conexión.");
+        console.warn("No se pudo sincronizar en línea:", err);
       } finally {
         if (btn) btn.innerText = "🔄 Sincronizar Tasa BCV vía Internet";
       }
@@ -770,7 +784,6 @@
     }
 
     function iniciarKiosco() {
-      reproducirSonido('beep');
       document.getElementById('pantalla-inicio').style.display = 'none';
       document.getElementById('pantalla-kiosco').style.display = 'flex';
       mostrarCategorias();
@@ -786,7 +799,6 @@
     }
 
     function filtrarPorCategoria(cat) {
-      reproducirSonido('beep');
       categoriaSeleccionada = cat;
       document.getElementById('input-buscar').value = "";
       document.getElementById('titulo-seccion').innerText = "Categoría: " + cat;
@@ -827,6 +839,7 @@
         let badgeHtml = estadoOferta.descuento > 0 ? `<div class="${estadoOferta.descuento === 50 ? 'badge-remate' : 'badge-oferta'}">${estadoOferta.etiqueta}</div>` : '';
         let barcodeHtml = p.codigoBarras ? `<div class="badge-barcode">#${p.codigoBarras}</div>` : '';
 
+        // ETIQUETA DE STOCK
         let stockHtml = '';
         let stockGramos = p.stockGramos !== undefined ? p.stockGramos : 10000;
         if (stockGramos <= 0) {
@@ -854,7 +867,6 @@
     }
 
     function seleccionarProducto(id) {
-      reproducirSonido('beep');
       let pesoNeto = obtenerPesoNeto();
       productoTemp = productos.find(p => p.id === id);
       
@@ -889,7 +901,7 @@
       const subtotalUsd = (pesoNeto / 1000) * estadoOferta.precioFinal;
       const subtotalBs = subtotalUsd * tasaBCV;
 
-      carrito.push({
+      window.carrito.push({
         id: productoTemp.id,
         nombre: productoTemp.nombre + (estadoOferta.descuento > 0 ? ` (${estadoOferta.etiqueta})` : ''),
         peso: pesoNeto,
@@ -931,19 +943,18 @@
     }
 
     function actualizarCarritoBadge() {
-      document.getElementById('cant-carrito').innerText = carrito.length;
+      document.getElementById('cant-carrito').innerText = window.carrito.length;
     }
 
     function abrirCarrito() {
-      reproducirSonido('beep');
       const contenedor = document.getElementById('lista-carrito');
       contenedor.innerHTML = '';
       let totalUsd = 0; let totalBs = 0;
 
-      if (carrito.length === 0) {
+      if (window.carrito.length === 0) {
         contenedor.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:15px;">El carrito está vacío</p>';
       } else {
-        carrito.forEach((item, index) => {
+        window.carrito.forEach((item, index) => {
           totalUsd += item.subtotalUsd; totalBs += item.subtotalBs;
           contenedor.innerHTML += `
             <div style="display:flex; justify-content:space-between; margin-bottom:10px; align-items:center;">
@@ -962,25 +973,29 @@
 
       document.getElementById('cart-total-usd').innerText = totalUsd.toFixed(2);
       document.getElementById('cart-total-bs').innerText = totalBs.toFixed(2);
+      
+      const msgDiv = document.getElementById('msg-autopago');
+      if (msgDiv) msgDiv.innerText = '';
+      
       abrirModal('modal-carrito');
     }
 
     function eliminarDelCarrito(index) {
-      reproducirSonido('beep');
-      carrito.splice(index, 1);
+      window.carrito.splice(index, 1);
       actualizarCarritoBadge();
       abrirCarrito();
     }
 
     function generarTicket() {
-      if (carrito.length === 0) { alert("Agregue al menos un producto al carrito."); return; }
+      if (window.carrito.length === 0) { alert("Agregue al menos un producto al carrito."); return; }
       cerrarModal('modal-carrito');
 
       const numSerial = "TK-" + Math.floor(100000 + Math.random() * 900000);
       const fechaHora = new Date().toLocaleString('es-VE');
       let totalUsd = 0; let totalBs = 0;
 
-      carrito.forEach(cartItem => {
+      // DESCONTAR STOCK DEL INVENTARIO LOCAL
+      window.carrito.forEach(cartItem => {
         let prod = productos.find(p => p.id === cartItem.id);
         if (prod) {
           if (prod.stockGramos === undefined) prod.stockGramos = 10000;
@@ -990,7 +1005,7 @@
       });
       localStorage.setItem('bascula_productos', JSON.stringify(productos));
 
-      datosUltimoTicket = { serial: numSerial, fecha: fechaHora, tasa: tasaBCV, items: [...carrito] };
+      datosUltimoTicket = { serial: numSerial, fecha: fechaHora, tasa: tasaBCV, items: [...window.carrito] };
 
       let html = `
         <div style="text-align:center; margin-bottom:8px;">
@@ -1002,7 +1017,7 @@
         ----------------------------------<br>
       `;
 
-      carrito.forEach(item => {
+      window.carrito.forEach(item => {
         totalUsd += item.subtotalUsd; totalBs += item.subtotalBs;
         html += `
           <b>${item.nombre}</b> (${item.peso}g)<br>
@@ -1013,14 +1028,14 @@
       datosUltimoTicket.totalUsd = totalUsd;
       datosUltimoTicket.totalBs = totalBs;
 
+      // GUARDAR EN HISTORIAL DE VENTAS DEL DÍA
       ventasHistorial.push({
         serial: numSerial,
         fecha: hoyStr,
         hora: new Date().toLocaleTimeString('es-VE'),
         totalUsd: totalUsd,
         totalBs: totalBs,
-        cantProductos: carrito.length,
-        pagoVerificadoFirebase: pagoValidadoFirebase
+        cantProductos: window.carrito.length
       });
       localStorage.setItem('bascula_ventas_historial', JSON.stringify(ventasHistorial));
       actualizarReporteAdmin();
@@ -1029,15 +1044,19 @@
         ----------------------------------<br>
         <div style="font-size:1.05rem; margin-top:4px;">
           <b>TOTAL USD: $${totalUsd.toFixed(2)}</b><br>
-          <b>TOTAL BS: Bs. ${totalBs.toFixed(2)}</b><br>
-          <small>Estatus Pago: ${pagoValidadoFirebase ? '✅ Verificado (Firebase)' : '⏳ Pendiente / Caja'}</small>
+          <b>TOTAL BS: Bs. ${totalBs.toFixed(2)}</b>
         </div>
       `;
 
       document.getElementById('contenido-ticket').innerHTML = html;
-      reproducirSonido('pago_ok');
+      
+      // Vaciar carrito tras emitir ticket
+      window.carrito = [];
+      actualizarCarritoBadge();
+      
       abrirModal('modal-ticket');
     }
+    window.generarTicket = generarTicket;
 
     function actualizarReporteAdmin() {
       let ventasHoy = ventasHistorial.filter(v => v.fecha === hoyStr);
@@ -1049,11 +1068,12 @@
       document.getElementById('rep-total-bs').innerText = totalBs.toFixed(2) + " Bs";
     }
 
+    // EXPORTACIÓN EXCEL / CSV
     function exportarVentasCSV() {
       if (ventasHistorial.length === 0) { alert("No hay ventas registradas para exportar."); return; }
-      let csvContent = "data:text/csv;charset=utf-8,Serial,Fecha,Hora,CantProductos,TotalUSD,TotalBS,PagoFirebase\n";
+      let csvContent = "data:text/csv;charset=utf-8,Serial,Fecha,Hora,CantProductos,TotalUSD,TotalBS\n";
       ventasHistorial.forEach(v => {
-        csvContent += `${v.serial},${v.fecha},${v.hora},${v.cantProductos},${v.totalUsd.toFixed(2)},${v.totalBs.toFixed(2)},${v.pagoVerificadoFirebase ? 'SI' : 'NO'}\n`;
+        csvContent += `${v.serial},${v.fecha},${v.hora},${v.cantProductos},${v.totalUsd.toFixed(2)},${v.totalBs.toFixed(2)}\n`;
       });
       descargarCSV(csvContent, `Ventas_${hoyStr}.csv`);
     }
@@ -1105,12 +1125,7 @@
     function repetirPesaje() { cerrarModal('modal-ticket'); }
 
     function reiniciarTodo() {
-      // Limpiar oyente de Firestore
-      if (unsubscribePagoListener) {
-        unsubscribePagoListener();
-        unsubscribePagoListener = null;
-      }
-      carrito = []; taraGramos = 0; datosUltimoTicket = null; pagoValidadoFirebase = false;
+      window.carrito = []; taraGramos = 0; datosUltimoTicket = null;
       actualizarCarritoBadge();
       cerrarModal('modal-ticket'); cerrarModal('modal-carrito'); cerrarModal('modal-confirmar');
       mostrarCategorias();
