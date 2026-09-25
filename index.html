@@ -468,96 +468,100 @@
       <button class="btn-action" onclick="cerrarModal('modal-admin')" style="width:100%; background:var(--border-color); color:var(--text);">Cerrar Panel</button>
     </div>
   </div>
+<!-- FIREBASE FIRESTORE SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getFirestore, collection, query, where, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-  <!-- FIREBASE FIRESTORE SDK -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  const firebaseConfig = {
+    apiKey: "AIzaSyAsBnDGC_E_oSoKrewTbmkrmw2JAjdcalU",
+    authDomain: "geomercado-9d642.firebaseapp.com",
+    projectId: "geomercado-9d642",
+    storageBucket: "geomercado-9d642.appspot.com",
+    messagingSenderId: "521126894575",
+    appId: "1:521126894575:web:4c847de3dd57d6a430b7a"
+  };
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyAsBnD8C_E_o5oHzmw7bWmKrmW2JAjdcaU",
-      authDomain: "geomercado-9d642.firebaseapp.com",
-      projectId: "geomercado-9d642",
-      storageBucket: "geomercado-9d642.firebasestorage.app",
-      messagingSenderId: "521126834575",
-      appId: "1:521126834575:web:4c847dec3dd57d9a439bfa"
-    };
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+  // Función Global para Autopago
+  window.validarPagoFirestore = async function() {
+    const rawInput = document.getElementById('ref-pago-input').value.trim();
+    const msgDiv = document.getElementById('msg-autopago');
+    const btnValidar = document.getElementById('btn-validar-pago');
 
-    // Función Global para Autopago
-    window.validarPagoFirestore = async function() {
-      const refInput = document.getElementById('ref-pago-input').value.trim();
-      const msgDiv = document.getElementById('msg-autopago');
-      const btnValidar = document.getElementById('btn-validar-pago');
+    if (!rawInput) {
+      msgDiv.className = "msg-error";
+      msgDiv.innerText = "❌ Por favor ingresa el número de referencia.";
+      return;
+    }
 
-      if (!refInput) {
-        msgDiv.className = "msg-error";
-        msgDiv.innerText = "❌ Por favor ingresa el número de referencia.";
-        return;
-      }
+    if (window.carrito.length === 0) {
+      msgDiv.className = "msg-error";
+      msgDiv.innerText = "❌ El carrito está vacío.";
+      return;
+    }
 
-      if (window.carrito.length === 0) {
-        msgDiv.className = "msg-error";
-        msgDiv.innerText = "❌ El carrito está vacío.";
-        return;
-      }
+    // Tomamos siempre los últimos 6 dígitos (coincide con MacroDroid)
+    const refInput = rawInput.slice(-6);
 
-      btnValidar.disabled = true;
-      msgDiv.className = "msg-cargando";
-      msgDiv.innerText = "⏳ Verificando pago con el banco en Firestore...";
+    btnValidar.disabled = true;
+    msgDiv.className = "msg-cargando";
+    msgDiv.innerText = "⏳ Verificando pago con el banco en Firestore...";
 
-      try {
-        const pagosRef = collection(db, "verificacion_pagos");
-        const q = query(pagosRef, where("referencia", "==", refInput));
-        const querySnapshot = await getDocs(q);
+    try {
+      const pagosRef = collection(db, "verificacion_pagos");
+      // CORRECCIÓN AQUÍ: Se busca por "referencia_6digitos"
+      const q = query(pagosRef, where("referencia_6digitos", "==", refInput));
+      const querySnapshot = await getDocs(q);
 
-        if (!querySnapshot.empty) {
-          let yaProcesado = false;
+      if (!querySnapshot.empty) {
+        let yaProcesado = false;
 
-          for (const docSnap of querySnapshot.docs) {
-            const data = docSnap.data();
+        for (const docSnap of querySnapshot.docs) {
+          const data = docSnap.data();
 
-            if (data.estado === "PROCESADO") {
-              msgDiv.className = "msg-error";
-              msgDiv.innerText = "⚠️ Esta referencia ya fue utilizada anteriormente.";
-              yaProcesado = true;
-              break;
-            }
-
-            // Marcar pago como consumido en la BD
-            await updateDoc(docSnap.ref, {
-              estado: "PROCESADO",
-              fecha_procesado: new Date().toISOString()
-            });
+          if (data.estado === "PROCESADO") {
+            msgDiv.className = "msg-error";
+            msgDiv.innerText = "⚠️ Esta referencia ya fue utilizada anteriormente.";
+            yaProcesado = true;
+            break;
           }
 
-          if (!yaProcesado) {
-            msgDiv.className = "msg-exito";
-            msgDiv.innerText = "✅ ¡Pago Confirmado Exitosamente!";
-            window.reproducirSonido('scan');
-
-            setTimeout(() => {
-              window.generarTicket();
-              document.getElementById('ref-pago-input').value = '';
-              msgDiv.innerText = '';
-            }, 1000);
-          }
-
-        } else {
-          msgDiv.className = "msg-error";
-          msgDiv.innerText = "❌ Referencia no encontrada. Verifica el número o espera unos segundos.";
+          // Marcar pago como consumido en la BD
+          await updateDoc(docSnap.ref, {
+            estado: "PROCESADO",
+            fecha_procesado: new Date().toISOString()
+          });
         }
-      } catch (error) {
-        console.error("Error al consultar Firestore:", error);
+
+        if (!yaProcesado) {
+          msgDiv.className = "msg-exito";
+          msgDiv.innerText = "✅ ¡Pago Confirmado Exitosamente!";
+          if (window.reproducirSonido) window.reproducirSonido('scan');
+
+          setTimeout(() => {
+            if (window.generarTicket) window.generarTicket();
+            document.getElementById('ref-pago-input').value = "";
+            msgDiv.innerText = "";
+          }, 1000);
+        }
+
+      } else {
         msgDiv.className = "msg-error";
-        msgDiv.innerText = "❌ Error de conexión al consultar la base de datos.";
-      } finally {
-        btnValidar.disabled = false;
+        msgDiv.innerText = "❌ Referencia no encontrada. Verifica el número o espera unos segundos.";
       }
-    };
-  </script>
+    } catch (error) {
+      console.error("Error al consultar Firestore:", error);
+      msgDiv.className = "msg-error";
+      msgDiv.innerText = "❌ Error de conexión al consultar la base de datos.";
+    } finally {
+      btnValidar.disabled = false;
+    }
+  };
+</script>
+  
 
   <!-- LÓGICA PRINCIPAL DE LA APP -->
   <script>
