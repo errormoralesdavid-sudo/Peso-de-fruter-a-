@@ -533,7 +533,7 @@
       }
     }
 
-    // VERIFICACIÓN DE PAGO EN FIREBASE FIRESTORE (Ajustado a la estructura REST/MacroDroid)
+    // VERIFICACIÓN DE PAGO EN FIREBASE FIRESTORE (CORREGIDA)
     async function verificarPagoFirebase() {
       const refInput = document.getElementById('ref-pago-input').value.trim();
       const statusDiv = document.getElementById('status-pago-firebase');
@@ -549,26 +549,17 @@
       statusDiv.innerText = "⏳ Verificando en Firebase...";
 
       try {
-        // Opción A: Buscar por ID del documento
-        let docRef = db.collection('verificacion_pagos').doc(refInput);
-        let docSnap = await docRef.get();
+        // Búsqueda directa por campo plano 'referencia_6digitos'
+        const snapshot = await db.collection('verificacion_pagos')
+          .where('referencia_6digitos', '==', refInput)
+          .get();
 
-        // Opción B: Si no está por ID, hacer búsqueda dentro del campo en fields
-        if (!docSnap.exists) {
-          const snapshot = await db.collection('verificacion_pagos')
-            .where('fields.referencia_6digitos.stringValue', '==', refInput)
-            .get();
-
-          if (!snapshot.empty) {
-            docSnap = snapshot.docs[0];
-          }
-        }
-
-        if (docSnap && docSnap.exists) {
+        if (!snapshot.empty) {
+          let docSnap = snapshot.docs[0];
           let data = docSnap.data();
           
-          let estado = data.estado || (data.fields && data.fields.estado ? data.fields.estado.stringValue : null);
-          let tienda = data.tienda || (data.fields && data.fields.tienda ? data.fields.tienda.stringValue : null);
+          let estado = data.estado;
+          let tienda = data.tienda;
 
           if (estado === 'verificado_banco' || estado === 'aprobado' || estado === 'completado') {
             pagoValidadoFirebase = true;
