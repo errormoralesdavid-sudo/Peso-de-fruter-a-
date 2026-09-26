@@ -378,13 +378,6 @@
         <div style="font-size: 1.2rem; font-weight:800; color:var(--text-muted);">Bs. <span id="cart-total-bs">0.00</span></div>
       </div>
 
-      <!-- AUTOPAGO DE PAGO MÓVIL SUPABASE -->
-      <div class="seccion-autopago">
-        <label for="ref-pago-input">📱 Validar Pago Móvil en Kiosco:</label>
-        <input type="number" id="ref-pago-input" placeholder="Ingresa N° Referencia (ej. 123456)">
-        <button class="btn-action" id="btn-validar-pago" onclick="validarPagoSupabase()" style="width:100%; background:var(--orange); color:white; padding:12px; font-size:1.05rem;">Validar Pago Móvil ⚡</button>
-        <div id="msg-autopago"></div>
-      </div>
       <!-- FIREBASE FIRESTORE SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -478,7 +471,6 @@
     }
   };
 </script>
-      
 
       <div style="display: flex; gap: 12px; margin-top:12px;">
         <button class="btn-action" onclick="cerrarModal('modal-carrito')" style="flex:1; background:rgba(0,0,0,0.08); color:var(--text);">Seguir Pesando</button>
