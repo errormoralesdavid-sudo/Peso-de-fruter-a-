@@ -10,7 +10,7 @@
   <script src="https://unpkg.com/@zxing/library@latest"></script>
   <!-- Librería Html5Qrcode para decodificación mediante captura de foto/archivo -->
   <script src="https://unpkg.com/html5-qrcode"></script>
-  <!-- Firebase SDKs -->
+   <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -27,7 +27,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Función Global para Autopago con Firebase Firestore
+    // Función Global para Autopago con validación de Referencia y Monto en Bs.
     window.validarPagoFirestore = async function() {
       const rawInput = document.getElementById('ref-pago-input').value.trim();
       const msgDiv = document.getElementById('msg-autopago');
@@ -45,12 +45,15 @@
         return;
       }
 
+      // Calcular el monto total actual en Bs. que debe pagar el cliente
+      let totalBsRequerido = window.carrito.reduce((acc, item) => acc + item.subtotalBs, 0);
+
       // Tomamos los últimos 6 dígitos (coincide con MacroDroid / Banco)
       const refInput = rawInput.slice(-6);
 
       btnValidar.disabled = true;
       msgDiv.className = "msg-cargando";
-      msgDiv.innerText = "⏳ Verificando pago con el banco en Firestore...";
+      msgDiv.innerText = "⏳ Verificando referencia y monto en Firestore...";
 
       try {
         const pagosRef = collection(db, "verificacion_pagos");
@@ -58,7 +61,7 @@
         const querySnapshot = await getDocs(q);
 
         if (!querySnapshot.empty) {
-          let yaProcesado = false;
+          let pagoEncontradoValido = false;
 
           for (const docSnap of querySnapshot.docs) {
             const data = docSnap.data();
@@ -66,27 +69,38 @@
             if (data.estado === "PROCESADO") {
               msgDiv.className = "msg-error";
               msgDiv.innerText = "⚠️ Esta referencia ya fue utilizada anteriormente.";
-              yaProcesado = true;
+              pagoEncontradoValido = true;
               break;
             }
 
-            // Marcar pago como consumido en la BD
+            // Validar monto (permitiendo un margen de tolerancia mínimo por redondeo de centavos de 1 Bs, ej: Math.abs)
+            let montoRegistradoEnPago = parseFloat(data.monto || data.monto_bs || 0);
+            
+            if (montoRegistradoEnPago > 0 && Math.abs(montoRegistradoEnPago - totalBsRequerido) > 1.50) {
+              msgDiv.className = "msg-error";
+              msgDiv.innerText = `❌ Monto incorrecto. Pagado: Bs. ${montoRegistradoEnPago.toFixed(2)} | Total a pagar: Bs. ${totalBsRequerido.toFixed(2)}`;
+              pagoEncontradoValido = true;
+              break;
+            }
+
+            // Marcar pago como consumido en la BD si todo coincide
             await updateDoc(docSnap.ref, {
               estado: "PROCESADO",
               fecha_procesado: new Date().toISOString()
             });
-          }
 
-          if (!yaProcesado) {
             msgDiv.className = "msg-exito";
-            msgDiv.innerText = "✅ ¡Pago Confirmado Exitosamente!";
+            msgDiv.innerText = "✅ ¡Pago y Monto Confirmados Exitosamente!";
             if (window.reproducirSonido) window.reproducirSonido('scan');
 
             setTimeout(() => {
               if (window.generarTicket) window.generarTicket('PAGADO');
               document.getElementById('ref-pago-input').value = "";
               msgDiv.innerText = "";
-            }, 1000);
+            }, 1200);
+
+            pagoEncontradoValido = true;
+            break;
           }
 
         } else {
