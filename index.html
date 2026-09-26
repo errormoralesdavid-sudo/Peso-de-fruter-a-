@@ -10,8 +10,99 @@
   <script src="https://unpkg.com/@zxing/library@latest"></script>
   <!-- Librería Html5Qrcode para decodificación mediante captura de foto/archivo -->
   <script src="https://unpkg.com/html5-qrcode"></script>
-  <!-- Supabase JS Client -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAsBnDGC_E_oSoKrewTbmkrmw2JAjdcalU",
+      authDomain: "geomercado-9d642.firebaseapp.com",
+      projectId: "geomercado-9d642",
+      storageBucket: "geomercado-9d642.appspot.com",
+      messagingSenderId: "521126894575",
+      appId: "1:521126894575:web:4c847de3dd57d6a430b7a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Función Global para Autopago con Firebase Firestore
+    window.validarPagoFirestore = async function() {
+      const rawInput = document.getElementById('ref-pago-input').value.trim();
+      const msgDiv = document.getElementById('msg-autopago');
+      const btnValidar = document.getElementById('btn-validar-pago');
+
+      if (!rawInput) {
+        msgDiv.className = "msg-error";
+        msgDiv.innerText = "❌ Por favor ingresa el número de referencia.";
+        return;
+      }
+
+      if (!window.carrito || window.carrito.length === 0) {
+        msgDiv.className = "msg-error";
+        msgDiv.innerText = "❌ El carrito está vacío.";
+        return;
+      }
+
+      // Tomamos los últimos 6 dígitos (coincide con MacroDroid / Banco)
+      const refInput = rawInput.slice(-6);
+
+      btnValidar.disabled = true;
+      msgDiv.className = "msg-cargando";
+      msgDiv.innerText = "⏳ Verificando pago con el banco en Firestore...";
+
+      try {
+        const pagosRef = collection(db, "verificacion_pagos");
+        const q = query(pagosRef, where("referencia_6digitos", "==", refInput));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+          let yaProcesado = false;
+
+          for (const docSnap of querySnapshot.docs) {
+            const data = docSnap.data();
+
+            if (data.estado === "PROCESADO") {
+              msgDiv.className = "msg-error";
+              msgDiv.innerText = "⚠️ Esta referencia ya fue utilizada anteriormente.";
+              yaProcesado = true;
+              break;
+            }
+
+            // Marcar pago como consumido en la BD
+            await updateDoc(docSnap.ref, {
+              estado: "PROCESADO",
+              fecha_procesado: new Date().toISOString()
+            });
+          }
+
+          if (!yaProcesado) {
+            msgDiv.className = "msg-exito";
+            msgDiv.innerText = "✅ ¡Pago Confirmado Exitosamente!";
+            if (window.reproducirSonido) window.reproducirSonido('scan');
+
+            setTimeout(() => {
+              if (window.generarTicket) window.generarTicket('PAGADO');
+              document.getElementById('ref-pago-input').value = "";
+              msgDiv.innerText = "";
+            }, 1000);
+          }
+
+        } else {
+          msgDiv.className = "msg-error";
+          msgDiv.innerText = "❌ Referencia no encontrada. Verifica el número o espera unos segundos.";
+        }
+      } catch (error) {
+        console.error("Error al consultar Firestore:", error);
+        msgDiv.className = "msg-error";
+        msgDiv.innerText = "❌ Error de conexión al consultar la base de datos.";
+      } finally {
+        btnValidar.disabled = false;
+      }
+    };
+  </script>
+
   <style>
     :root {
       --primary: #2d6a4f;
@@ -42,7 +133,6 @@
     * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; margin: 0; padding: 0; }
     body { background: var(--bg-gradient); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; user-select: none; transition: background 0.4s, color 0.4s; }
 
-    /* ANIMACIONES */
     @keyframes fadeInScale {
       from { opacity: 0; transform: scale(0.95) translateY(10px); }
       to { opacity: 1; transform: scale(1) translateY(0); }
@@ -64,7 +154,6 @@
       50% { transform: translateY(-10px) rotate(2deg); }
     }
 
-    /* GLASSMORFISMO GENÉRICO */
     .glass-panel {
       background: var(--glass-bg);
       backdrop-filter: blur(16px);
@@ -74,7 +163,6 @@
       border-radius: 24px;
     }
 
-    /* PANTALLA INICIO */
     #pantalla-inicio {
       display: flex; flex-direction: column; justify-content: center; align-items: center;
       height: 100vh; background: var(--bg-gradient); color: white; text-align: center; padding: 20px;
@@ -102,7 +190,6 @@
     .btn-comenzar:hover { transform: translateY(-4px) scale(1.04); box-shadow: 0 18px 35px rgba(244,162,97,0.7); }
     .btn-comenzar:active { transform: translateY(1px) scale(0.98); }
 
-    /* HEADER */
     #pantalla-kiosco { display: none; flex-direction: column; height: 100vh; animation: fadeInScale 0.4s ease-out; }
     
     header {
@@ -124,7 +211,6 @@
 
     .tasa-ticker { font-size: 0.85rem; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 12px; font-weight: 800; color: #fff; display: inline-block; margin-top: 2px; border: 1px solid rgba(255,255,255,0.25); cursor: pointer; }
 
-    /* CUERPO */
     .contenedor-cuerpo { flex: 1; overflow-y: auto; padding: 22px; display: flex; flex-direction: column; }
     
     .seccion-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
@@ -135,7 +221,6 @@
     }
     .btn-volver-cat:hover { background: rgba(255,255,255,0.3); transform: translateX(-3px); }
 
-    /* BUSCADOR */
     .buscador-container { display: flex; align-items: center; gap: 8px; width: 100%; max-width: 440px; }
     .input-busqueda {
       padding: 12px 20px; border-radius: 25px; border: 1px solid var(--glass-border); flex: 1; font-weight: 700; outline: none; 
@@ -151,10 +236,7 @@
     .btn-icon-search:hover { border-color: var(--primary-light); background: rgba(255,255,255,0.3); transform: scale(1.1); }
     .btn-icon-search.recording { animation: pulseGlow 1s infinite; border-color: #ef4444; }
 
-    /* CATEGORÍAS */
-    .grid-categorias {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; width: 100%;
-    }
+    .grid-categorias { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; width: 100%; }
     .card-categoria {
       background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
       border-radius: 24px; padding: 25px 16px; text-align: center; border: 1px solid var(--glass-border);
@@ -166,10 +248,7 @@
     .card-categoria:hover .icon-cat { transform: scale(1.15) rotate(5deg); }
     .card-categoria h3 { font-size: 1.2rem; color: white; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
 
-    /* GRID DE PRODUCTOS */
-    .grid-productos {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; width: 100%;
-    }
+    .grid-productos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; width: 100%; }
     @media (min-width: 600px) {
       .grid-productos { grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 20px; }
       .grid-categorias { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 22px; }
@@ -187,7 +266,6 @@
     .card-producto .precio-usd { color: var(--primary); font-weight: 900; font-size: 1.15rem; }
     .card-producto .precio-bs { color: var(--text-muted); font-weight: 700; font-size: 0.88rem; margin-top: 2px; }
 
-    /* ETIQUETAS */
     .badge-oferta { position: absolute; top: 10px; right: 10px; background: #e76f51; color: white; font-size: 0.7rem; font-weight: 900; padding: 4px 10px; border-radius: 12px; text-transform: uppercase; box-shadow: 0 4px 10px rgba(231,111,81,0.4); }
     .badge-remate { position: absolute; top: 10px; right: 10px; background: #d90429; color: white; font-size: 0.7rem; font-weight: 900; padding: 4px 10px; border-radius: 12px; text-transform: uppercase; animation: pulseGlow 1.5s infinite; box-shadow: 0 4px 10px rgba(217,4,41,0.5); }
     .badge-barcode { position: absolute; top: 10px; left: 10px; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); color: white; font-size: 0.65rem; font-weight: 800; padding: 3px 8px; border-radius: 8px; }
@@ -197,7 +275,6 @@
     .stock-out { background: #fee2e2; color: #b91c1c; }
     .precio-tachado { text-decoration: line-through; color: #94a3b8; font-size: 0.85rem; margin-left: 4px; }
 
-    /* CARRITO FLOTANTE */
     .btn-carrito-flotante {
       position: fixed; bottom: 28px; right: 28px; 
       background: linear-gradient(135deg, #2d6a4f, #1b4332); color: white;
@@ -218,7 +295,6 @@
       box-shadow: 0 12px 25px rgba(0,0,0,0.4); transition: all 0.75s cubic-bezier(0.55, 0.055, 0.675, 0.19); border: 2px solid white;
     }
 
-    /* MODALES */
     .modal { 
       display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
       background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
@@ -302,7 +378,6 @@
           <input type="text" class="input-busqueda" id="input-buscar" placeholder="🔍 Buscar producto..." oninput="buscarProductosDirecto()">
           <button class="btn-icon-search" id="btn-voz" onclick="iniciarReconocimientoVoz()" title="Buscar por voz">🎙️</button>
           
-          <!-- CONTROLES CAPTURA Y GALERÍA KIOSCO -->
           <input type="file" id="input-camera-kiosco" accept="image/*" capture="environment" style="display: none;" onchange="procesarFotoCodigoBarras(this.files[0], 'kiosco')">
           <input type="file" id="input-gallery-kiosco" accept="image/*" style="display: none;" onchange="procesarFotoCodigoBarras(this.files[0], 'kiosco')">
 
@@ -367,99 +442,27 @@
     </div>
   </div>
 
-      <!-- FIREBASE FIRESTORE SDK -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getFirestore, collection, query, where, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+  <!-- MODAL DE CARRITO Y AUTOPAGO -->
+  <div class="modal" id="modal-carrito">
+    <div class="modal-contenido" style="text-align: center;">
+      <h2 style="font-weight:900; margin-bottom:12px;">Tu Carrito de Compras</h2>
+      
+      <div id="lista-carrito" style="max-height: 200px; overflow-y: auto; text-align: left; margin-bottom: 12px; border-top: 1px solid rgba(0,0,0,0.1); border-bottom: 1px solid rgba(0,0,0,0.1); padding: 8px 0;">
+        <!-- Items del carrito -->
+      </div>
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyAsBnDGC_E_oSoKrewTbmkrmw2JAjdcalU",
-    authDomain: "geomercado-9d642.firebaseapp.com",
-    projectId: "geomercado-9d642",
-    storageBucket: "geomercado-9d642.appspot.com",
-    messagingSenderId: "521126894575",
-    appId: "1:521126894575:web:4c847de3dd57d6a430b7a"
-  };
+      <div style="background: var(--accent); padding: 12px; border-radius: 16px; margin-bottom: 12px;">
+        <div style="font-size: 1.4rem; color: var(--primary); font-weight:900;">Total: $<span id="cart-total-usd">0.00</span></div>
+        <div style="font-size: 1.1rem; color: var(--primary-dark); font-weight:800;">Bs. <span id="cart-total-bs">0.00</span></div>
+      </div>
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  // Función Global para Autopago
-  window.validarPagoFirestore = async function() {
-    const rawInput = document.getElementById('ref-pago-input').value.trim();
-    const msgDiv = document.getElementById('msg-autopago');
-    const btnValidar = document.getElementById('btn-validar-pago');
-
-    if (!rawInput) {
-      msgDiv.className = "msg-error";
-      msgDiv.innerText = "❌ Por favor ingresa el número de referencia.";
-      return;
-    }
-
-    if (window.carrito.length === 0) {
-      msgDiv.className = "msg-error";
-      msgDiv.innerText = "❌ El carrito está vacío.";
-      return;
-    }
-
-    // Tomamos siempre los últimos 6 dígitos (coincide con MacroDroid)
-    const refInput = rawInput.slice(-6);
-
-    btnValidar.disabled = true;
-    msgDiv.className = "msg-cargando";
-    msgDiv.innerText = "⏳ Verificando pago con el banco en Firestore...";
-
-    try {
-      const pagosRef = collection(db, "verificacion_pagos");
-      // CORRECCIÓN AQUÍ: Se busca por "referencia_6digitos"
-      const q = query(pagosRef, where("referencia_6digitos", "==", refInput));
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        let yaProcesado = false;
-
-        for (const docSnap of querySnapshot.docs) {
-          const data = docSnap.data();
-
-          if (data.estado === "PROCESADO") {
-            msgDiv.className = "msg-error";
-            msgDiv.innerText = "⚠️ Esta referencia ya fue utilizada anteriormente.";
-            yaProcesado = true;
-            break;
-          }
-
-          // Marcar pago como consumido en la BD
-          await updateDoc(docSnap.ref, {
-            estado: "PROCESADO",
-            fecha_procesado: new Date().toISOString()
-          });
-        }
-
-        if (!yaProcesado) {
-          msgDiv.className = "msg-exito";
-          msgDiv.innerText = "✅ ¡Pago Confirmado Exitosamente!";
-          if (window.reproducirSonido) window.reproducirSonido('scan');
-
-          setTimeout(() => {
-            if (window.generarTicket) window.generarTicket();
-            document.getElementById('ref-pago-input').value = "";
-            msgDiv.innerText = "";
-          }, 1000);
-        }
-
-      } else {
-        msgDiv.className = "msg-error";
-        msgDiv.innerText = "❌ Referencia no encontrada. Verifica el número o espera unos segundos.";
-      }
-    } catch (error) {
-      console.error("Error al consultar Firestore:", error);
-      msgDiv.className = "msg-error";
-      msgDiv.innerText = "❌ Error de conexión al consultar la base de datos.";
-    } finally {
-      btnValidar.disabled = false;
-    }
-  };
-</script>
+      <!-- SECCIÓN AUTOPAGO FIRESTORE -->
+      <div class="seccion-autopago">
+        <label>💳 Validar Pago Móvil / Banco (Autopago):</label>
+        <input type="text" id="ref-pago-input" placeholder="Últimos 6 dígitos de referencia">
+        <button class="btn-action" id="btn-validar-pago" onclick="validarPagoFirestore()" style="width: 100%; background: #2563eb; color: white; padding: 10px; font-size: 0.9rem;">Verificar Pago en Banco</button>
+        <div id="msg-autopago"></div>
+      </div>
 
       <div style="display: flex; gap: 12px; margin-top:12px;">
         <button class="btn-action" onclick="cerrarModal('modal-carrito')" style="flex:1; background:rgba(0,0,0,0.08); color:var(--text);">Seguir Pesando</button>
@@ -554,8 +557,6 @@
         <input type="date" id="adm-fecha-ingreso" style="width:100%; padding:10px; margin-bottom:8px; border-radius:12px; border:1px solid rgba(0,0,0,0.15); background:var(--card-bg); color:var(--text); font-weight:600;">
 
         <label style="font-size:0.82rem; font-weight:800; color:var(--text-muted); display:block; margin-bottom:3px;">📷 Imagen del Producto (URL o Archivo):</label>
-        
-        <!-- NUEVO: Campo de texto para URL -->
         <input type="url" id="adm-img-url" placeholder="O pega la URL de la imagen aquí" style="width:100%; padding:10px; margin-bottom:8px; border-radius:12px; border:1px solid rgba(0,0,0,0.15); background:var(--card-bg); color:var(--text); font-weight:600;">
         
         <div style="display:flex; gap:6px; margin-bottom:8px;">
@@ -572,12 +573,9 @@
         <button class="btn-action" id="btn-guardar-prod" onclick="guardarProductoAdmin()" style="width:100%; background:var(--primary); color:white; padding:10px;">Guardar Producto</button>
       </div>
 
-      <!-- INVENTARIO Y MODIFICACIÓN DE PRODUCTOS -->
       <div style="background:rgba(0,0,0,0.04); padding:14px; border-radius:18px; margin-bottom:14px; border:1px solid rgba(0,0,0,0.08);">
         <h4 style="margin-bottom:8px; font-weight:800;">📋 Administrar Inventario</h4>
-        <div id="lista-admin-productos" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
-          <!-- Lista de productos con botón de edición -->
-        </div>
+        <div id="lista-admin-productos" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
       </div>
 
       <div style="background:rgba(0,0,0,0.04); padding:14px; border-radius:18px; margin-bottom:14px; border:1px solid rgba(0,0,0,0.08);">
@@ -617,8 +615,6 @@
       </div>
 
       <label style="font-size:0.82rem; font-weight:800; color:var(--text-muted);">Imagen del Producto (URL o Archivo):</label>
-      
-      <!-- NUEVO: Campo de texto para URL en Edición -->
       <input type="url" id="edit-prod-img-url" placeholder="O pega la URL de la imagen aquí" style="width:100%; padding:8px; margin-bottom:8px; border-radius:10px; border:1px solid rgba(0,0,0,0.15); font-weight:600;">
       
       <div style="display:flex; gap:6px; margin-bottom:8px;">
@@ -638,103 +634,6 @@
       </div>
     </div>
   </div>
-
-  <!-- CONFIGURACIÓN SUPABASE & INTEGRACIÓN CLIENTE -->
-  <script>
-    const SUPABASE_URL = 'https://TU_SUPABASE_URL.supabase.co';
-    const SUPABASE_KEY = 'TU_SUPABASE_ANON_KEY';
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    window.validarPagoSupabase = async function() {
-      const rawInput = document.getElementById('ref-pago-input').value.trim();
-      const msgDiv = document.getElementById('msg-autopago');
-      const btnValidar = document.getElementById('btn-validar-pago');
-
-      if (!rawInput) {
-        msgDiv.className = "msg-error";
-        msgDiv.innerText = "❌ Por favor ingresa el número de referencia.";
-        return;
-      }
-
-      if (!window.carrito || window.carrito.length === 0) {
-        msgDiv.className = "msg-error";
-        msgDiv.innerText = "❌ El carrito está vacío.";
-        return;
-      }
-
-      const totalBsCarrito = window.carrito.reduce((sum, item) => sum + item.subtotalBs, 0);
-      const refInput = rawInput.slice(-6);
-
-      btnValidar.disabled = true;
-      msgDiv.className = "msg-cargando";
-      msgDiv.innerText = "⏳ Verificando pago y monto en el banco...";
-
-      try {
-        const { data, error } = await supabase
-          .from('verificacion_pagos')
-          .select('*')
-          .eq('referencia_6digitos', refInput);
-
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-          let yaProcesado = false;
-          let montoValido = false;
-          let docEncontrado = null;
-
-          for (const registro of data) {
-            if (registro.estado === "PROCESADO") {
-              msgDiv.className = "msg-error";
-              msgDiv.innerText = "⚠️ Esta referencia ya fue utilizada previamente.";
-              yaProcesado = true;
-              break;
-            }
-
-            const montoBanco = parseFloat(registro.monto || 0);
-            if (Math.abs(montoBanco - totalBsCarrito) <= 0.50) {
-              montoValido = true;
-              docEncontrado = registro;
-            } else {
-              msgDiv.className = "msg-error";
-              msgDiv.innerText = `❌ El monto pagado (${montoBanco.toFixed(2)} Bs) no coincide con el total del carrito (${totalBsCarrito.toFixed(2)} Bs).`;
-              btnValidar.disabled = false;
-              return;
-            }
-          }
-
-          if (!yaProcesado && montoValido && docEncontrado) {
-            await supabase
-              .from('verificacion_pagos')
-              .update({
-                estado: "PROCESADO",
-                fecha_procesado: new Date().toISOString()
-              })
-              .eq('id', docEncontrado.id);
-
-            msgDiv.className = "msg-exito";
-            msgDiv.innerText = "✅ ¡Pago Confirmado! Generando Ticket...";
-            if (window.reproducirSonido) window.reproducirSonido('scan');
-
-            setTimeout(() => {
-              if (window.generarTicket) window.generarTicket('PAGADO');
-              document.getElementById('ref-pago-input').value = "";
-              msgDiv.innerText = "";
-            }, 1000);
-          }
-
-        } else {
-          msgDiv.className = "msg-error";
-          msgDiv.innerText = "❌ Referencia no encontrada. Verifique el número.";
-        }
-      } catch (error) {
-        console.error("Error al consultar Supabase:", error);
-        msgDiv.className = "msg-error";
-        msgDiv.innerText = "❌ Error de conexión al verificar pago.";
-      } finally {
-        btnValidar.disabled = false;
-      }
-    };
-  </script>
 
   <!-- LÓGICA PRINCIPAL DEL APLICATIVO POS -->
   <script>
@@ -795,9 +694,7 @@
       aplicarLogo();
       actualizarDisplaysTasa();
       actualizarDisplayPeso();
-      
       obtenerTasaBCVOnline();
-      
       iniciarMonitoreoInactividad();
       actualizarReporteAdmin();
       document.getElementById('adm-fecha-ingreso').value = hoyStr;
@@ -839,26 +736,23 @@
         }
         throw new Error("Respuesta no válida del endpoint principal");
       } catch (err) {
-        console.warn("Fallo en rates.dolarvzla.com, respaldando con DolarApi...", err);
         try {
           const response = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { cache: 'no-cache' });
           if (!response.ok) throw new Error("Error HTTP: " + response.status);
           const data = await response.json();
-          
           let tasaAlMomento = data.promedio || data.precio;
           if (tasaAlMomento && !isNaN(tasaAlMomento) && tasaAlMomento > 0) {
             guardarTasaEnStorage(parseFloat(tasaAlMomento));
             return;
           }
         } catch (e) {
-          console.error("No se pudo obtener la tasa en vivo de ninguna API.", e);
+          console.error("No se pudo obtener la tasa en vivo.", e);
         }
       } finally {
         if (btn) btn.innerText = "🔄 Sincronizar Tasa BCV (DolarApi / Rates)";
       }
     }
 
-    /* CAPTURA/SELECCIÓN DE IMÁGENES Y SUBIDA A SUPABASE */
     function manejarSeleccionImagen(event, prevKey) {
       const file = event.target.files[0];
       if (!file) return;
@@ -870,7 +764,6 @@
       const boxContainer = document.getElementById(`${prevKey}-box`);
       if (boxContainer) boxContainer.style.display = 'block';
       
-      // Si se sube una imagen, se puede vaciar el campo URL para evitar confusiones
       if (prevKey === 'prev-add') {
         document.getElementById('adm-img-url').value = '';
       } else if (prevKey === 'prev-edit') {
@@ -878,31 +771,8 @@
       }
     }
 
-    async function subirImagenSupabase(file) {
-      if (!file) return null;
-      try {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `products/${fileName}`;
-
-        const { data, error } = await supabase.storage.from('product-images').upload(filePath, file);
-        if (error) {
-          console.error('Error subiendo imagen a Supabase Storage:', error);
-          return null;
-        }
-
-        const { data: publicData } = supabase.storage.from('product-images').getPublicUrl(filePath);
-        return publicData.publicUrl;
-      } catch (e) {
-        console.error('Fallo en subida de imagen:', e);
-        return null;
-      }
-    }
-
-    /* MÓDULO DE ESCANEO DE CÓDIGO POR FOTO (HTML5-QRCODE) */
     async function procesarFotoCodigoBarras(archivo, origen = 'kiosco') {
       if (!archivo) return;
-
       const html5QrScanner = new Html5Qrcode("html5-qrcode-hidden-reader", false);
 
       try {
@@ -924,8 +794,7 @@
           }
         }
       } catch (error) {
-        console.error("Error al decodificar la foto:", error);
-        alert("❌ No se pudo detectar ningún código de barras en la imagen. Intenta con mejor iluminación o más de cerca.");
+        alert("❌ No se pudo detectar ningún código de barras en la imagen.");
       } finally {
         document.getElementById('input-camera-kiosco').value = "";
         document.getElementById('input-gallery-kiosco').value = "";
@@ -1002,10 +871,8 @@
       `;
 
       document.getElementById('contenido-ticket').innerHTML = html;
-      
       window.carrito = [];
       actualizarCarritoBadge();
-      
       abrirModal('modal-ticket');
     }
     window.generarTicket = generarTicket;
@@ -1074,14 +941,11 @@
       let nuevo = prompt("Ingresa el peso en gramos para probar (ej. 500 para medio kilo):", pesoBrutoGramos);
       if (nuevo !== null && !isNaN(nuevo)) {
         document.getElementById('estado-peso-lbl').innerText = "🟡 AJUSTANDO...";
-        document.getElementById('estado-peso-lbl').style.color = "#d97706";
-        
         setTimeout(() => {
           pesoBrutoGramos = parseInt(nuevo);
           actualizarDisplayPeso();
           reproducirSonido('balanza');
           document.getElementById('estado-peso-lbl').innerText = "🟢 PESO ESTABLE";
-          document.getElementById('estado-peso-lbl').style.color = "#52b788";
         }, 300);
       }
     }
@@ -1211,10 +1075,6 @@
         return;
       }
 
-      if (pesoNeto === 0) {
-        alert("Peso en 0g. Toca la balanza superior para colocar un peso simulado.");
-      }
-
       const estadoOferta = calcularEstadoOferta(productoTemp);
       const subtotalUsd = (pesoNeto / 1000) * estadoOferta.precioFinal;
       const subtotalBs = subtotalUsd * tasaBCV;
@@ -1245,36 +1105,8 @@
       });
 
       reproducirSonido('beep');
-      animarVueloAlCarrito(productoTemp.img, e);
       cerrarModal('modal-confirmar');
       actualizarCarritoBadge();
-    }
-
-    function animarVueloAlCarrito(imgSrc, event) {
-      const cartBtn = document.getElementById('btn-cart-float');
-      const cartRect = cartBtn.getBoundingClientRect();
-
-      let startX = event ? event.clientX : window.innerWidth / 2;
-      let startY = event ? event.clientY : window.innerHeight / 2;
-
-      const flyImg = document.createElement('img');
-      flyImg.src = imgSrc; flyImg.className = 'vuelo-item';
-      flyImg.style.left = `${startX - 30}px`; flyImg.style.top = `${startY - 30}px`;
-      document.body.appendChild(flyImg);
-
-      requestAnimationFrame(() => {
-        flyImg.style.left = `${cartRect.left + cartRect.width / 2 - 15}px`;
-        flyImg.style.top = `${cartRect.top + cartRect.height / 2 - 15}px`;
-        flyImg.style.width = '25px'; flyImg.style.height = '25px'; flyImg.style.opacity = '0.3';
-      });
-
-      setTimeout(() => {
-        flyImg.remove();
-        const badge = document.getElementById('cant-carrito');
-        badge.classList.remove('anim-bounce');
-        void badge.offsetWidth;
-        badge.classList.add('anim-bounce');
-      }, 750);
     }
 
     function actualizarCarritoBadge() {
@@ -1429,7 +1261,6 @@
       if (url) { logoUrl = url; localStorage.setItem('bascula_logo_url', logoUrl); aplicarLogo(); alert("Logo actualizado."); }
     }
 
-    /* GUARDAR / CREAR PRODUCTO */
     async function guardarProductoAdmin() {
       const btn = document.getElementById('btn-guardar-prod');
       const nombre = document.getElementById('adm-nombre').value;
@@ -1439,8 +1270,6 @@
       const codigoBarras = document.getElementById('adm-codigo-barras').value.trim();
       const diasVida = parseInt(document.getElementById('adm-dias-vida').value) || 5;
       const fechaIngreso = document.getElementById('adm-fecha-ingreso').value || hoyStr;
-      
-      // Capturamos el valor de la URL
       const imgUrlInput = document.getElementById('adm-img-url').value.trim();
 
       if (!nombre || isNaN(precio)) { alert("Ingresa nombre y precio válido."); return; }
@@ -1448,25 +1277,17 @@
       btn.disabled = true;
       btn.innerText = "Guardando...";
 
-      // Prioridad: 1. Archivo subido, 2. URL ingresada, 3. Placeholder por defecto
       let imgUrl = imgUrlInput || 'https://via.placeholder.com/200?text=Producto';
-      if (archivosImagenes['prev-add']) {
-        const subida = await subirImagenSupabase(archivosImagenes['prev-add']);
-        if (subida) imgUrl = subida;
-      }
 
       productos.push({ id: Date.now(), nombre, categoria, precioKg: precio, stockGramos, codigoBarras, diasVida, fechaIngreso, img: imgUrl });
       localStorage.setItem('bascula_productos', JSON.stringify(productos));
 
       alert("Producto registrado exitosamente.");
 
-      // Limpiar Formulario
       document.getElementById('adm-nombre').value = '';
       document.getElementById('adm-precio').value = '';
       document.getElementById('adm-codigo-barras').value = '';
       document.getElementById('adm-img-url').value = '';
-      archivosImagenes['prev-add'] = null;
-      document.getElementById('prev-add-box').style.display = 'none';
 
       btn.disabled = false;
       btn.innerText = "Guardar Producto";
@@ -1475,7 +1296,6 @@
       if (categoriaSeleccionada) filtrarPorCategoria(categoriaSeleccionada);
     }
 
-    /* RENDER Y EDICIÓN DE PRODUCTOS */
     function renderizarListaAdmin() {
       const container = document.getElementById('lista-admin-productos');
       container.innerHTML = '';
@@ -1509,10 +1329,9 @@
       document.getElementById('edit-prod-nombre').value = p.nombre;
       document.getElementById('edit-prod-precio').value = p.precioKg;
       document.getElementById('edit-prod-categoria').value = p.categoria || 'Frutería';
-      document.getElementById('edit-prod-img-url').value = p.img; // Cargamos la URL actual en el input
+      document.getElementById('edit-prod-img-url').value = p.img;
       document.getElementById('prev-edit-img').src = p.img;
 
-      archivosImagenes['prev-edit'] = null;
       abrirModal('modal-editar-producto');
     }
 
@@ -1534,15 +1353,8 @@
       productos[prodIndex].precioKg = precio;
       productos[prodIndex].categoria = categoria;
       
-      // Actualiza la imagen con el campo URL si se provee
       if (imgUrlInput) {
         productos[prodIndex].img = imgUrlInput;
-      }
-
-      // El archivo adjunto sobreescribe el input manual de URL
-      if (archivosImagenes['prev-edit']) {
-        const nuevaUrl = await subirImagenSupabase(archivosImagenes['prev-edit']);
-        if (nuevaUrl) productos[prodIndex].img = nuevaUrl;
       }
 
       localStorage.setItem('bascula_productos', JSON.stringify(productos));
@@ -1570,14 +1382,6 @@
         await device.gatt.connect();
         alert("Conectado a la Báscula BLE exitosamente.");
       } catch (e) { alert("Simulación activa: " + e.message); }
-    }
-  </script>
-
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').then(() => console.log("SW Activo")).catch(err => console.log("Error SW:", err));
-      });
     }
   </script>
 </body>
