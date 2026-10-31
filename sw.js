@@ -2,7 +2,7 @@
    SW.JS - SERVICE WORKER PARA SOPORTE OFFLINE Y CACHÉ SEGURO
    ========================================================== */
 
-const CACHE_NAME = 'bascula-pos-cache-v1';
+const CACHE_NAME = 'bascula-pos-cache-v2';
 
 // Recursos estáticos esenciales para funcionar sin conexión
 const ASSETS_TO_CACHE = [
