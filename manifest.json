@@ -1,13 +1,13 @@
 {
-  "name": "Kiosco Báscula POS Glass PWA Pro",
+  "name": "Báscula POS Pro — Terminal de Autopago",
   "short_name": "Báscula POS",
-  "description": "Sistema Kiosco de Autoservicio, Báscula Inteligente, Autopago y Control de Inventario.",
+  "description": "Terminal Kiosco Báscula POS Inteligente con Autopago QR Suiche 7B, Control Antirrobo e Inventario Híbrido.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0f2027",
-  "theme_color": "#1b4332",
+  "background_color": "#0b131e",
+  "theme_color": "#0b131e",
   "lang": "es-VE",
   "categories": ["business", "finance", "productivity", "shopping"],
   "icons": [
