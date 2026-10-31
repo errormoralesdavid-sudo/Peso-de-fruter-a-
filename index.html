@@ -3,38 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#1b4332">
-  <meta name="description" content="Sistema Kiosco Báscula POS Inteligente con Autopago y Gestión de Inventario">
-  <title>Báscula POS</title>
+  <meta name="theme-color" content="#0b131e">
+  <meta name="description" content="Terminal Kiosco Báscula POS Inteligente con Autopago QR Suiche 7B, Control Antirrobo e Inventario">
+  <title>Báscula POS Pro — Autopago</title>
   
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
   
-  <!-- Hojas de Estilo -->
+  <!-- Hoja de Estilos Profesional Única -->
   <link rel="stylesheet" href="styles.css">
 
   <!-- Librerías Externas (Licencia MIT - Seguras para Producción en GitHub) -->
-  <!-- Anime.js para animaciones fluidas de interfaz y físicas -->
+  <!-- Anime.js para animaciones físicas y de interfaz -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js" defer></script>
-  <!-- Lodash para optimización de búsqueda (debounce) y manejo de colecciones -->
+  <!-- Lodash para optimización de búsqueda (debounce) y colecciones -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js" defer></script>
-  <!-- D3.js para visualización estadística de ventas e inventario en el Panel Admin -->
+  <!-- D3.js para analítica visual en el Panel Admin -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js" defer></script>
+  <!-- QRCode Generator para motor QR Bancario Suiche 7B (Nivel H con logo central) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" defer></script>
 </head>
 <body>
 
-  <!-- CONTENEDOR DE NOTIFICACIONES FLOTANTES (TOASTS - Reemplazo seguro de alert) -->
+  <!-- CONTENEDOR DE NOTIFICACIONES FLOTANTES (TOASTS) -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
   <!-- 1. PANTALLA DE BIENVENIDA (INICIO) -->
   <section id="pantalla-inicio" class="pantalla-activa">
-    <img id="img-logo-bienvenida" class="logo-bienvenida" src="https://cdn-icons-png.flaticon.com/512/1046/1046857.png" alt="Logo Kiosco">
-    <h1>Autoservicio & Báscula</h1>
-    <div class="badge-tasa-inicio">
-      💵 Tasa Oficial BCV: <b id="tasa-display-inicio">Cargando...</b> Bs/$
+    <div class="hero-card-inicio">
+      <img id="img-logo-bienvenida" class="logo-bienvenida" src="https://cdn-icons-png.flaticon.com/512/1046/1046857.png" alt="Logo Comercio">
+      <h1>Terminal de Autoservicio & Báscula</h1>
+      
+      <div class="badge-tasa-inicio">
+        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="1" x2="12" y2="23"></line>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+        <span>Tasa Oficial BCV: <b id="tasa-display-inicio">Cargando...</b> Bs/$</span>
+      </div>
+
+      <p class="subtitulo-inicio">Coloque su producto sobre la balanza o seleccione artículos por unidad</p>
+      
+      <button id="btn-comenzar" class="btn-comenzar" type="button">
+        <span>INICIAR COMPRA</span>
+        <svg class="svg-icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </button>
     </div>
-    <p class="subtitulo-inicio">Coloque su producto sobre la balanza para empezar</p>
-    <button id="btn-comenzar" class="btn-comenzar" type="button">¡COMENZAR!</button>
   </section>
 
   <!-- 2. PANTALLA PRINCIPAL DEL KIOSCO -->
@@ -43,61 +60,141 @@
       <div class="header-logo-container">
         <img id="img-logo-header" class="header-logo" src="https://cdn-icons-png.flaticon.com/512/1046/1046857.png" alt="Logo">
         <div>
-          <h2 class="header-titulo">BÁSCULA POS</h2>
-          <div id="btn-actualizar-tasa-header" class="tasa-ticker" title="Clic para sincronizar tasa BCV">
-            BCV: <span id="tasa-display-header">--.--</span> Bs/$ 🔄
-          </div>
+          <h2 class="header-titulo">BÁSCULA POS PRO</h2>
+          <button id="btn-actualizar-tasa-header" class="tasa-ticker" type="button" title="Sincronizar tasa BCV">
+            <span>BCV: <b id="tasa-display-header">--.--</b> Bs/$</span>
+            <svg class="svg-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+          </button>
         </div>
       </div>
       
+      <!-- Indicador Central de Balanza Digital -->
       <div class="peso-box">
-        <div id="btn-simular-peso" class="peso-display" title="Clic para ajustar peso de prueba">
-          ⚖️ <span id="peso-val">0</span> <small>g</small>
+        <div id="btn-simular-peso" class="peso-display" title="Toca para simular peso de prueba">
+          <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M12 3v18"></path>
+            <path d="M5 7h14"></path>
+            <path d="M3 14l2-7 2 7a2 2 0 0 1-4 0z"></path>
+            <path d="M17 14l2-7 2 7a2 2 0 0 1-4 0z"></path>
+          </svg>
+          <span id="peso-val">0</span>
+          <small>g</small>
         </div>
-        <div class="estado-peso" id="estado-peso-lbl">🟢 PESO ESTABLE</div>
-        <button id="btn-tara" class="btn-tara" type="button">[ TARA - 0g ]</button>
+        <div class="peso-meta-row">
+          <div class="estado-peso" id="estado-peso-lbl">
+            <span class="dot-status"></span> PESO ESTABLE
+          </div>
+          <button id="btn-tara" class="btn-tara" type="button">TARA 0g</button>
+        </div>
       </div>
 
+      <!-- Controles de Hardware y Admin -->
       <div class="header-actions">
-        <button id="btn-tema" class="btn-admin-header" type="button" title="Cambiar Tema Oscuro/Claro">🌙</button>
-        <button id="btn-acceso-admin" class="btn-admin-header" type="button">⚙️ Admin</button>
-        <button id="btn-conectar-ble" class="btn-admin-header btn-ble" type="button" title="Conectar Balanza Bluetooth">📡 BLE</button>
+        <button id="btn-conectar-usb" class="btn-admin-header btn-hw" type="button" title="Conectar Balanza por Cable USB Serial">
+          <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+          </svg>
+          <span>USB</span>
+        </button>
+        <button id="btn-conectar-ble" class="btn-admin-header btn-hw" type="button" title="Conectar Balanza por Bluetooth BLE">
+          <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+          </svg>
+          <span>BLE</span>
+        </button>
+        <button id="btn-acceso-admin" class="btn-admin-header" type="button" title="Panel Administrador">
+          <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Admin</span>
+        </button>
       </div>
     </header>
 
     <div class="contenedor-cuerpo">
       <div class="seccion-top">
         <div class="nav-categorias-box">
-          <button class="btn-volver-cat" id="btn-volver" type="button">⬅️ Categorías</button>
+          <button class="btn-volver-cat" id="btn-volver" type="button">
+            <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            <span>Categorías</span>
+          </button>
           <h2 id="titulo-seccion" class="titulo-seccion">Seleccione una Categoría</h2>
         </div>
         
-        <!-- Buscador limpio (compatible con teclado y lector de código de barras USB/OTG) -->
+        <!-- Buscador compatible con Lector de Código de Barras USB/OTG -->
         <div class="buscador-container">
-          <input type="search" class="input-busqueda" id="input-buscar" placeholder="🔍 Buscar por nombre o código de barras..." autocomplete="off">
+          <svg class="search-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="search" class="input-busqueda" id="input-buscar" placeholder="Buscar por nombre o escanear código de barras..." autocomplete="off">
         </div>
       </div>
 
-      <!-- VISTA 1: CATEGORÍAS -->
+      <!-- VISTA 1: CATEGORÍAS CON ICONOS SVG VECTORIALES -->
       <div class="grid-categorias" id="vista-categorias">
         <div class="card-categoria" data-categoria="Frutería">
-          <div class="icon-cat">🍎</div>
+          <div class="icon-cat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"></path>
+              <path d="M10 2c1 .5 2 2 2 5"></path>
+            </svg>
+          </div>
           <h3>Frutería</h3>
         </div>
+
         <div class="card-categoria" data-categoria="Verdulería">
-          <div class="icon-cat">🥦</div>
+          <div class="icon-cat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M2.27 21.7s9.87-3.5 12.73-6.36a4.5 4.5 0 0 0-6.36-6.37C5.77 11.84 2.27 21.7 2.27 21.7z"></path>
+              <path d="M8.64 14l-2.05-2.04M15.34 15l-2.46-2.46"></path>
+              <path d="M22 9s-1.33-2-3.5-2C16.86 7 15 9 15 9s1.33 2 3.5 2S22 9 22 9z"></path>
+              <path d="M15 2s-2 1.33-2 3.5S15 9 15 9s2-1.84 2-3.5C17 3.33 15 2 15 2z"></path>
+            </svg>
+          </div>
           <h3>Verdulería</h3>
         </div>
+
         <div class="card-categoria" data-categoria="Manicería">
-          <div class="icon-cat">🥜</div>
+          <div class="icon-cat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M12 2a4 4 0 0 0-4 4v2a4 4 0 0 0 2 3.46V12.5a4 4 0 0 0-2 3.46V18a4 4 0 0 0 8 0v-2.04a4 4 0 0 0-2-3.46v-1.04A4 4 0 0 0 16 8V6a4 4 0 0 0-4-4z"></path>
+              <circle cx="10.5" cy="6.5" r=".5"></circle>
+              <circle cx="13.5" cy="17.5" r=".5"></circle>
+            </svg>
+          </div>
           <h3>Manicería</h3>
         </div>
+
         <div class="card-categoria" data-categoria="Granos">
-          <div class="icon-cat">🫘</div>
+          <div class="icon-cat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <ellipse cx="9" cy="12" rx="5" ry="7" transform="rotate(-20 9 12)"></ellipse>
+              <path d="M7 7c2 3 2 7 0 10"></path>
+              <ellipse cx="16" cy="13" rx="4" ry="6" transform="rotate(15 16 13)"></ellipse>
+            </svg>
+          </div>
           <h3>Granos</h3>
         </div>
+
         <div class="card-categoria" data-categoria="Charcutería">
-          <div class="icon-cat">🧀</div>
+          <div class="icon-cat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M3 10l9-6 9 6v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9z"></path>
+              <path d="M3 10h18"></path>
+              <circle cx="8" cy="15" r="1.5"></circle>
+              <circle cx="15" cy="16" r="2"></circle>
+            </svg>
+          </div>
           <h3>Charcutería</h3>
         </div>
       </div>
@@ -107,18 +204,36 @@
     </div>
 
     <!-- BOTÓN FLOTANTE DEL CARRITO -->
-    <button class="btn-carrito-flotante" id="btn-cart-float" type="button" title="Ver carrito (F4)">
-      🛒
+    <button class="btn-carrito-flotante" id="btn-cart-float" type="button" title="Ver carrito y Autopago (F4)">
+      <svg class="svg-icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <circle cx="9" cy="21" r="1"></circle>
+        <circle cx="20" cy="21" r="1"></circle>
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+      </svg>
       <div class="badge-carrito" id="cant-carrito">0</div>
     </button>
   </main>
 
-  <!-- MODAL 1: CONFIRMACIÓN DE COMPRA POR PESO -->
+  <!-- MODAL 1: CONFIRMACIÓN HÍBRIDA (POR PESO EN GRAMOS O POR UNIDAD) -->
   <div class="modal" id="modal-confirmar" role="dialog" aria-modal="true">
     <div class="modal-contenido text-center">
       <h2 id="modal-prod-nombre" class="modal-titulo">Producto</h2>
       <img id="modal-prod-img" class="modal-prod-imagen" src="" alt="Producto seleccionado">
-      <p class="modal-peso-texto">Peso neto registrado: <b id="modal-peso">0</b> g</p>
+      
+      <!-- Modo 1: Venta por Peso -->
+      <div id="bloque-modo-peso" class="modal-peso-texto">
+        Peso neto en balanza: <b id="modal-peso">0</b> g
+      </div>
+
+      <!-- Modo 2: Venta por Unidad -->
+      <div id="bloque-modo-unidad" class="selector-unidades-box" style="display:none;">
+        <span class="label-admin">Seleccione cantidad de unidades:</span>
+        <div class="controles-unidad">
+          <button type="button" id="btn-restar-unidad" class="btn-unidad-step">-</button>
+          <span id="val-unidades" class="display-unidades">1</span>
+          <button type="button" id="btn-sumar-unidad" class="btn-unidad-step">+</button>
+        </div>
+      </div>
       
       <div id="modal-descuento-info" class="modal-descuento-badge"></div>
 
@@ -129,61 +244,160 @@
 
       <div class="modal-botones-row">
         <button class="btn-action btn-secundario" type="button" data-close="modal-confirmar">Cancelar</button>
-        <button class="btn-action btn-primario" id="btn-confirmar-agregar" type="button">Agregar 🛒</button>
+        <button class="btn-action btn-primario" id="btn-confirmar-agregar" type="button">
+          <span>Agregar al Carrito</span>
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL 2: CARRITO Y AUTOPAGO FIRESTORE -->
+  <!-- MODAL 2: CARRITO, AUDITORÍA DE PESO Y AUTOPAGO QR SUICHE 7B -->
   <div class="modal" id="modal-carrito" role="dialog" aria-modal="true">
-    <div class="modal-contenido text-center">
-      <h2 class="modal-titulo">Tu Carrito de Compras</h2>
+    <div class="modal-contenido modal-carrito-ancho text-center">
+      <div class="admin-header-bar">
+        <h2 class="modal-titulo">Resumen de Compra & Autopago</h2>
+        <button class="btn-cerrar-icono" type="button" data-close="modal-carrito">
+          <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
       
       <div id="lista-carrito" class="lista-carrito-scroll"></div>
 
+      <!-- Auditoría Antirrobo de Peso Acumulado -->
+      <div id="barra-auditoria-peso" class="auditoria-peso-bar">
+        <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        </svg>
+        <span>Peso esperado en bolsa: <b id="peso-esperado-cart">0g</b> | En balanza: <b id="peso-actual-cart">0g</b></span>
+      </div>
+
+      <!-- Selector de Método de Pago (Pago Móvil Bs vs Divisas con IGTF 3%) -->
+      <div class="tabs-metodo-pago">
+        <button type="button" id="tab-pagomovil" class="tab-pago active">Pago Móvil QR (Bs)</button>
+        <button type="button" id="tab-divisas" class="tab-pago">Divisas / Efectivo (+IGTF 3%)</button>
+      </div>
+
       <div class="modal-totales-box compacto">
-        <div class="modal-precio-usd">Total: $<span id="cart-total-usd">0.00</span></div>
+        <div class="modal-precio-usd">Total: $<span id="cart-total-usd">0.00</span> <small id="badge-igtf-activo" style="display:none; font-size:0.75rem; color:#f59e0b;">(Incl. 3% IGTF)</small></div>
         <div class="modal-precio-bs">Bs. <span id="cart-total-bs">0.00</span></div>
       </div>
 
-      <!-- SECCIÓN AUTOPAGO BANCARIO / FIRESTORE -->
-      <div class="seccion-autopago">
-        <label for="ref-pago-input">💳 Validar Pago Móvil / Banco (Autopago):</label>
-        <input type="text" id="ref-pago-input" maxlength="12" inputmode="numeric" placeholder="Últimos 6 dígitos de referencia" autocomplete="off">
-        <button class="btn-action btn-azul-full" id="btn-validar-pago" type="button">Verificar Pago en Banco</button>
+      <!-- PANEL A: AUTOPAGO BANCARIO QR SUICHE 7B + FIRESTORE EN VIVO -->
+      <div id="panel-autopago-qr" class="seccion-autopago">
+        <div class="autopago-grid">
+          <!-- Columna Izquierda: QR Suiche 7B Idéntico a los Bancos -->
+          <div class="qr-bancario-card">
+            <div class="qr-canvas-wrapper">
+              <canvas id="qr-suiche-canvas" width="200" height="200"></canvas>
+            </div>
+            <span class="qr-caption">Escanea desde tu App Bancaria</span>
+          </div>
+
+          <!-- Columna Derecha: Datos del Comercio + Verificación -->
+          <div class="datos-autopago-col">
+            <div class="datos-comercio-box">
+              <div class="dato-fila"><span>Banco:</span> <b id="lbl-banco-comercio">0102 - Banco de Venezuela</b></div>
+              <div class="dato-fila"><span>RIF / CI:</span> <b id="lbl-rif-comercio">V-12345678</b></div>
+              <div class="dato-fila"><span>Teléfono:</span> <b id="lbl-tel-comercio">0412-0000000</b></div>
+            </div>
+
+            <div class="estado-listener-vivo">
+              <span class="pulse-dot"></span>
+              <span>Escuchando pago en tiempo real...</span>
+            </div>
+
+            <label for="ref-pago-input">O ingresa los últimos 6 dígitos de referencia:</label>
+            <div class="input-numpad-group">
+              <input type="text" id="ref-pago-input" maxlength="6" readonly placeholder="Toca para digitar (6 dígitos)">
+              <button type="button" id="btn-abrir-numpad-ref" class="btn-teclado-svg" title="Abrir Teclado Táctil">
+                <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                  <path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"></path>
+                </svg>
+              </button>
+            </div>
+            <button class="btn-action btn-azul-full" id="btn-validar-pago" type="button">Verificar Pago Ahora</button>
+          </div>
+        </div>
         <div id="msg-autopago"></div>
       </div>
 
+      <!-- PANEL B: PAGO EN CAJA / DIVISAS CON CALCULADORA DE VUELTO -->
+      <div id="panel-pago-divisas" class="seccion-autopago" style="display:none;">
+        <p class="texto-ayuda-modal">Pagos en divisas efectivo aplican 3% de IGTF según normativa SENIAT. Genere su ticket para cancelar en taquilla.</p>
+      </div>
+
       <div class="modal-botones-row">
-        <button class="btn-action btn-secundario" type="button" data-close="modal-carrito">Seguir Pesando</button>
-        <button class="btn-action btn-primario" id="btn-ticket-pendiente" type="button">Ticket para Caja 🧾</button>
+        <button class="btn-action btn-secundario" type="button" data-close="modal-carrito">Seguir Comprando</button>
+        <button class="btn-action btn-primario" id="btn-ticket-pendiente" type="button">Emitir Ticket para Caja</button>
       </div>
     </div>
   </div>
   
-  <!-- MODAL 3: TICKET GENERADO -->
+  <!-- MODAL 3: TICKET GENERADO CON QR DE AUDITORÍA DE SALIDA -->
   <div class="modal" id="modal-ticket" role="dialog" aria-modal="true">
     <div class="modal-contenido text-center">
-      <h2 class="modal-titulo">¡Ticket Generado!</h2>
-      <p class="texto-ayuda-modal">Lleve este ticket a la caja o consérvelo como comprobante.</p>
+      <h2 class="modal-titulo">Comprobante Digital Emitido</h2>
+      <p class="texto-ayuda-modal">Presente este código de auditoría en la salida o consérvelo.</p>
       
       <div class="ticket-impresion" id="contenido-ticket"></div>
+      <div class="qr-auditoria-box">
+        <canvas id="qr-ticket-auditoria" width="130" height="130"></canvas>
+      </div>
 
       <div class="modal-botones-col">
-        <button class="btn-action btn-azul-full" id="btn-imprimir-bt" type="button">🖨️ Imprimir Ticket (Bluetooth)</button>
+        <button class="btn-action btn-azul-full" id="btn-imprimir-bt" type="button">
+          <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          <span>Imprimir en Térmica (Bluetooth)</span>
+        </button>
         <div class="modal-botones-row">
-          <button class="btn-action btn-naranja" id="btn-repetir-pesaje" type="button">🔄 Pesar Otro</button>
-          <button class="btn-action btn-primario" id="btn-finalizar-salir" type="button">Aceptar y Salir</button>
+          <button class="btn-action btn-naranja" id="btn-repetir-pesaje" type="button">Seguir Comprando</button>
+          <button class="btn-action btn-primario" id="btn-finalizar-salir" type="button">Finalizar y Salir</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- MODAL 4: SIMULADOR / AJUSTE DE PESO (Reemplazo limpio de prompt) -->
+  <!-- MODAL 4: TECLADO NUMÉRICO TÁCTIL INTEGRADO (NUMPAD) -->
+  <div class="modal" id="modal-numpad" role="dialog" aria-modal="true">
+    <div class="modal-contenido text-center" style="max-width: 350px;">
+      <h3 id="numpad-titulo" class="modal-titulo">Teclado Numérico</h3>
+      <input type="text" id="numpad-display" class="numpad-visor" readonly>
+      
+      <div class="numpad-grid">
+        <button type="button" class="numpad-key" data-key="1">1</button>
+        <button type="button" class="numpad-key" data-key="2">2</button>
+        <button type="button" class="numpad-key" data-key="3">3</button>
+        <button type="button" class="numpad-key" data-key="4">4</button>
+        <button type="button" class="numpad-key" data-key="5">5</button>
+        <button type="button" class="numpad-key" data-key="6">6</button>
+        <button type="button" class="numpad-key" data-key="7">7</button>
+        <button type="button" class="numpad-key" data-key="8">8</button>
+        <button type="button" class="numpad-key" data-key="9">9</button>
+        <button type="button" class="numpad-key key-clear" data-key="C">C</button>
+        <button type="button" class="numpad-key" data-key="0">0</button>
+        <button type="button" class="numpad-key key-back" data-key="BACK">⌫</button>
+      </div>
+
+      <div class="modal-botones-row">
+        <button class="btn-action btn-secundario" type="button" data-close="modal-numpad">Cancelar</button>
+        <button class="btn-action btn-primario" id="btn-numpad-ok" type="button">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: SIMULADOR DE PESO -->
   <div class="modal" id="modal-peso-sim" role="dialog" aria-modal="true">
     <div class="modal-contenido text-center" style="max-width: 380px;">
-      <h3 class="modal-titulo">⚖️ Simular Peso en Balanza</h3>
-      <p class="texto-ayuda-modal">Ingresa el peso bruto en gramos (ej. 500 para medio kilo):</p>
+      <h3 class="modal-titulo">Simular Peso en Balanza</h3>
+      <p class="texto-ayuda-modal">Seleccione un peso rápido o digite los gramos:</p>
       <input type="number" id="input-peso-sim" class="input-form-admin text-center" min="0" max="50000" step="5" placeholder="Ej: 500">
       <div class="chips-peso-rapido">
         <button type="button" class="chip-peso" data-gramos="250">250g</button>
@@ -198,30 +412,22 @@
     </div>
   </div>
 
-  <!-- MODAL 5: ACCESO SEGURIDAD ADMIN (Reemplazo seguro de prompt) -->
-  <div class="modal" id="modal-pin" role="dialog" aria-modal="true">
-    <div class="modal-contenido text-center" style="max-width: 360px;">
-      <h3 class="modal-titulo">🔒 Acceso Administrador</h3>
-      <p class="texto-ayuda-modal">Ingrese su clave de seguridad:</p>
-      <input type="password" id="input-pin-acceso" class="input-form-admin text-center" placeholder="••••" autocomplete="off">
-      <div class="modal-botones-row">
-        <button class="btn-action btn-secundario" type="button" data-close="modal-pin">Cancelar</button>
-        <button class="btn-action btn-primario" id="btn-verificar-pin" type="button">Entrar</button>
-      </div>
-    </div>
-  </div>
-
   <!-- MODAL 6: PANEL DE CONTROL ADMINISTRADOR -->
   <div class="modal" id="modal-admin" role="dialog" aria-modal="true">
     <div class="modal-contenido modal-admin-ancho">
       <div class="admin-header-bar">
-        <h2 class="modal-titulo">Panel de Control Admin</h2>
-        <button class="btn-cerrar-icono" type="button" data-close="modal-admin">✖</button>
+        <h2 class="modal-titulo">Panel de Control & Configuración POS</h2>
+        <button class="btn-cerrar-icono" type="button" data-close="modal-admin">
+          <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
       </div>
       
       <!-- Reporte y Gráfica D3.js -->
       <div class="bloque-admin">
-        <h4>📊 Reporte de Ventas del Día</h4>
+        <h4>Reporte Financiero del Día & Stock por Categoría</h4>
         <div class="metricas-admin-grid">
           <div class="metrica-card">
             <span>Tickets Hoy</span>
@@ -236,37 +442,51 @@
             <b id="rep-total-bs">0.00 Bs</b>
           </div>
         </div>
-        <!-- Contenedor para micro-gráfico D3.js de stock por categoría -->
         <div id="d3-chart-container" class="d3-chart-box"></div>
         <div class="modal-botones-row">
-          <button class="btn-action btn-csv-ventas" id="btn-exportar-ventas" type="button">📥 Exportar Ventas (.CSV)</button>
-          <button class="btn-action btn-csv-cat" id="btn-exportar-catalogo" type="button">📦 Exportar Catálogo (.CSV)</button>
+          <button class="btn-action btn-csv-ventas" id="btn-exportar-ventas" type="button">Exportar Ventas (.CSV)</button>
+          <button class="btn-action btn-csv-cat" id="btn-exportar-catalogo" type="button">Exportar Catálogo (.CSV)</button>
         </div>
       </div>
 
-      <!-- Configuración Tasa BCV -->
+      <!-- Configuración Datos Bancarios para QR Suiche 7B -->
       <div class="bloque-admin">
-        <h4>💵 Configuración Tasa BCV Oficial</h4>
+        <h4>Configuración Pago Móvil QR (Motor Suiche 7B)</h4>
+        <div class="dos-columnas-form">
+          <div>
+            <label class="label-admin">Código y Nombre Banco:</label>
+            <input type="text" id="adm-pm-banco" class="input-form-admin" placeholder="0102 - Banco de Venezuela">
+          </div>
+          <div>
+            <label class="label-admin">Cédula / RIF Comercio:</label>
+            <input type="text" id="adm-pm-rif" class="input-form-admin" placeholder="J123456789 o V12345678">
+          </div>
+        </div>
+        <div class="fila-input-boton">
+          <input type="text" id="adm-pm-tel" class="input-form-admin" placeholder="Teléfono (Ej: 04121234567)">
+          <button class="btn-action btn-primario" id="btn-guardar-pm" type="button">Guardar Datos QR</button>
+        </div>
+      </div>
+
+      <!-- Configuración Tasa BCV y Logo -->
+      <div class="bloque-admin">
+        <h4>Tasa BCV Oficial & Logo Comercial</h4>
         <div class="fila-input-boton">
           <input type="number" step="0.01" id="adm-tasa" class="input-form-admin" placeholder="Ej: 36.50">
-          <button class="btn-action btn-primario" id="btn-guardar-tasa" type="button">Guardar</button>
+          <button class="btn-action btn-primario" id="btn-guardar-tasa" type="button">Guardar Tasa</button>
         </div>
-        <button id="btn-sincronizar" class="link-sincronizar" type="button">🔄 Sincronizar Tasa BCV en Vivo (DolarApi / Rates)</button>
-      </div>
-
-      <!-- Configuración Logo -->
-      <div class="bloque-admin">
-        <h4>🖼️ Logo del Negocio</h4>
-        <div class="fila-input-boton">
-          <input type="url" id="adm-logo" class="input-form-admin" placeholder="URL de la imagen del logo">
-          <button class="btn-action btn-secundario" id="btn-actualizar-logo" type="button">Aplicar</button>
+        <button id="btn-sincronizar" class="link-sincronizar" type="button">Sincronizar Tasa BCV en Tiempo Real</button>
+        
+        <div class="fila-input-boton" style="margin-top:10px;">
+          <input type="url" id="adm-logo" class="input-form-admin" placeholder="URL del logo de la empresa">
+          <button class="btn-action btn-secundario" id="btn-actualizar-logo" type="button">Cambiar Logo</button>
         </div>
       </div>
 
-      <!-- Formulario Crear Producto -->
+      <!-- Formulario Crear Producto (Híbrido: Peso o Unidad) -->
       <div class="bloque-admin">
-        <h4>🍎 Registrar Nuevo Producto</h4>
-        <input type="text" id="adm-nombre" class="input-form-admin" placeholder="Nombre (ej. Fresa de Montaña)">
+        <h4>Registrar Nuevo Producto</h4>
+        <input type="text" id="adm-nombre" class="input-form-admin" placeholder="Nombre del producto (ej. Fresa de Montaña)">
         
         <div class="dos-columnas-form">
           <div>
@@ -280,37 +500,43 @@
             </select>
           </div>
           <div>
-            <label class="label-admin">Precio ($ / Kg):</label>
+            <label class="label-admin">Modo de Venta:</label>
+            <select id="adm-tipo-venta" class="input-form-admin">
+              <option value="peso">Por Peso (Balanza Kg/g)</option>
+              <option value="unidad">Por Unidad (Pieza / Empaque)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="dos-columnas-form">
+          <div>
+            <label class="label-admin">Precio ($ por Kg o Unidad):</label>
             <input type="number" step="0.01" id="adm-precio" class="input-form-admin" placeholder="Ej: 2.50">
           </div>
+          <div>
+            <label class="label-admin">Stock (Gramos o Unidades):</label>
+            <input type="number" id="adm-stock" class="input-form-admin" value="10000">
+          </div>
         </div>
 
         <div class="dos-columnas-form">
           <div>
-            <label class="label-admin">📦 Stock (Gramos):</label>
-            <input type="number" id="adm-stock" class="input-form-admin" value="10000" placeholder="Ej: 10000">
-          </div>
-          <div>
-            <label class="label-admin">🏷️ Código de Barras:</label>
+            <label class="label-admin">Código de Barras:</label>
             <input type="text" id="adm-codigo-barras" class="input-form-admin" placeholder="Escanea o escribe">
           </div>
-        </div>
-
-        <div class="dos-columnas-form">
           <div>
-            <label class="label-admin">📅 Días de vida útil:</label>
+            <label class="label-admin">Días de vida útil:</label>
             <input type="number" id="adm-dias-vida" class="input-form-admin" value="5">
           </div>
-          <div>
-            <label class="label-admin">📦 Fecha de Ingreso:</label>
-            <input type="date" id="adm-fecha-ingreso" class="input-form-admin">
-          </div>
         </div>
 
-        <label class="label-admin">🖼️ Imagen del Producto (URL o Galería):</label>
+        <label class="label-admin">Fecha de Ingreso del Lote:</label>
+        <input type="date" id="adm-fecha-ingreso" class="input-form-admin">
+
+        <label class="label-admin">Imagen del Producto (URL o Galería):</label>
         <div class="fila-input-boton">
-          <input type="url" id="adm-img-url" class="input-form-admin" placeholder="Pega la URL de la imagen o sube de galería">
-          <button type="button" class="btn-action btn-secundario" id="btn-galeria-add">🖼️ Galería</button>
+          <input type="url" id="adm-img-url" class="input-form-admin" placeholder="Pega URL o selecciona de galería">
+          <button type="button" class="btn-action btn-secundario" id="btn-galeria-add">Subir Galería</button>
         </div>
         <input type="file" id="img-gallery-add" accept="image/*" style="display:none;">
 
@@ -318,21 +544,21 @@
           <img id="prev-add-img" src="" alt="Vista previa">
         </div>
 
-        <button class="btn-action btn-primario w-100" id="btn-guardar-prod" type="button">Guardar Producto</button>
+        <button class="btn-action btn-primario w-100" id="btn-guardar-prod" type="button">Guardar Producto en Catálogo</button>
       </div>
 
       <!-- Lista de Inventario -->
       <div class="bloque-admin">
-        <h4>📋 Administrar Inventario (<span id="contador-inventario">0</span>)</h4>
+        <h4>Administrar Inventario (<span id="contador-inventario">0</span>)</h4>
         <div id="lista-admin-productos" class="lista-admin-scroll"></div>
       </div>
 
       <!-- Seguridad -->
       <div class="bloque-admin">
-        <h4>🔒 Cambiar Clave de Acceso</h4>
+        <h4>Cambiar PIN de Administrador</h4>
         <div class="fila-input-boton">
-          <input type="password" id="adm-nueva-clave" class="input-form-admin" placeholder="Nueva contraseña (mín. 4 caracteres)">
-          <button class="btn-action btn-secundario" id="btn-cambiar-clave" type="button">Actualizar</button>
+          <input type="password" id="adm-nueva-clave" class="input-form-admin" placeholder="Nuevo PIN numérico (mín. 4 dígitos)">
+          <button class="btn-action btn-secundario" id="btn-cambiar-clave" type="button">Actualizar PIN</button>
         </div>
       </div>
 
@@ -343,17 +569,13 @@
   <!-- MODAL 7: EDITAR PRODUCTO COMPLETO -->
   <div class="modal" id="modal-editar-producto" role="dialog" aria-modal="true">
     <div class="modal-contenido">
-      <h3 class="modal-titulo">✏️ Editar Producto</h3>
+      <h3 class="modal-titulo">Editar Producto</h3>
       <input type="hidden" id="edit-prod-id">
 
       <label class="label-admin">Nombre:</label>
       <input type="text" id="edit-prod-nombre" class="input-form-admin">
 
       <div class="dos-columnas-form">
-        <div>
-          <label class="label-admin">Precio ($ / Kg):</label>
-          <input type="number" step="0.01" id="edit-prod-precio" class="input-form-admin">
-        </div>
         <div>
           <label class="label-admin">Categoría:</label>
           <select id="edit-prod-categoria" class="input-form-admin">
@@ -364,34 +586,44 @@
             <option value="Charcutería">Charcutería</option>
           </select>
         </div>
+        <div>
+          <label class="label-admin">Modo de Venta:</label>
+          <select id="edit-prod-tipo" class="input-form-admin">
+            <option value="peso">Por Peso (Kg/g)</option>
+            <option value="unidad">Por Unidad</option>
+          </select>
+        </div>
       </div>
 
       <div class="dos-columnas-form">
         <div>
-          <label class="label-admin">Stock (Gramos):</label>
+          <label class="label-admin">Precio ($):</label>
+          <input type="number" step="0.01" id="edit-prod-precio" class="input-form-admin">
+        </div>
+        <div>
+          <label class="label-admin">Stock (Gramos o Unid.):</label>
           <input type="number" id="edit-prod-stock" class="input-form-admin">
         </div>
+      </div>
+
+      <div class="dos-columnas-form">
         <div>
           <label class="label-admin">Código de Barras:</label>
           <input type="text" id="edit-prod-codigo" class="input-form-admin">
         </div>
-      </div>
-
-      <div class="dos-columnas-form">
         <div>
           <label class="label-admin">Días de vida útil:</label>
           <input type="number" id="edit-prod-dias" class="input-form-admin">
         </div>
-        <div>
-          <label class="label-admin">Fecha de Ingreso:</label>
-          <input type="date" id="edit-prod-fecha" class="input-form-admin">
-        </div>
       </div>
 
-      <label class="label-admin">Imagen del Producto (URL o Galería):</label>
+      <label class="label-admin">Fecha de Ingreso:</label>
+      <input type="date" id="edit-prod-fecha" class="input-form-admin">
+
+      <label class="label-admin">Imagen (URL o Galería):</label>
       <div class="fila-input-boton">
         <input type="url" id="edit-prod-img-url" class="input-form-admin" placeholder="URL de la imagen">
-        <button type="button" class="btn-action btn-secundario" id="btn-galeria-edit">🖼️ Galería</button>
+        <button type="button" class="btn-action btn-secundario" id="btn-galeria-edit">Galería</button>
       </div>
       <input type="file" id="img-gallery-edit" accept="image/*" style="display:none;">
 
@@ -406,7 +638,7 @@
     </div>
   </div>
 
-  <!-- Lógica Principal de la Aplicación (Módulo ES6 con Firebase + Anime.js + Lodash + D3) -->
+  <!-- Lógica Principal de la Súper App -->
   <script type="module" src="app.js"></script>
 </body>
 </html>
