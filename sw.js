@@ -1,10 +1,10 @@
 /* ==========================================================
-   SW.JS - SERVICE WORKER PARA SOPORTE OFFLINE Y CACHÉ SEGURO
+   SW.JS - SERVICE WORKER V2 (SOPORTE OFFLINE + MOTOR QR SUICHE 7B)
    ========================================================== */
 
-const CACHE_NAME = 'bascula-pos-cache-v2';
+const CACHE_NAME = 'bascula-pos-pro-cache-v3';
 
-// Recursos estáticos esenciales para funcionar sin conexión
+// Recursos estáticos esenciales (incluye Anime.js, Lodash, D3.js y Motor QR)
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -14,10 +14,11 @@ const ASSETS_TO_CACHE = [
   'https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js',
   'https://cdn-icons-png.flaticon.com/512/1046/1046857.png'
 ];
 
-// 1. INSTALACIÓN: Guarda en caché los archivos principales
+// 1. INSTALACIÓN: Guarda en caché el núcleo de la Súper App
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -27,7 +28,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// 2. ACTIVACIÓN: Elimina cachés antiguas cuando subes cambios a GitHub
+// 2. ACTIVACIÓN: Limpia versiones viejas (v1) automáticamente al actualizar en GitHub
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -43,21 +44,22 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// 3. INTERCEPTOR DE RED (FETCH): Protege APIs en vivo y acelera estáticos
+// 3. INTERCEPTOR DE RED (FETCH): Protege Firestore y tasas BCV en vivo
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // REGLA DE SEGURIDAD: Nunca cachear Firestore ni APIs de tasas de cambio
+  // REGLA DE SEGURIDAD FINANCIERA: Nunca cachear validaciones de pago ni tasas de cambio
   if (
     url.hostname.includes('firestore.googleapis.com') ||
+    url.hostname.includes('gstatic.com') ||
     url.hostname.includes('dolarvzla.com') ||
     url.hostname.includes('dolarapi.com') ||
     event.request.method !== 'GET'
   ) {
-    return; // Deja que pase directo a internet en tiempo real
+    return; // Pasa directo a internet en tiempo real
   }
 
-  // Estrategia: Buscar en Caché primero, si no está, ir a Red y guardar copia
+  // Estrategia Cache-First con actualización dinámica para imágenes de productos
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
@@ -66,7 +68,6 @@ self.addEventListener('fetch', (event) => {
 
       return fetch(event.request)
         .then((networkResponse) => {
-          // Solo cachear respuestas válidas de recursos estáticos o imágenes
           if (
             !networkResponse ||
             networkResponse.status !== 200 ||
@@ -83,7 +84,6 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(() => {
-          // Si no hay internet y pide navegar a la página, devolver index.html
           if (event.request.mode === 'navigate') {
             return caches.match('./index.html');
           }
