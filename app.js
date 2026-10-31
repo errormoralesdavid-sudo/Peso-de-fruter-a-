@@ -1,9 +1,9 @@
 /* ==========================================================
-   APP.JS - LÓGICA PRINCIPAL KIOSCO BÁSCULA POS PWA PRO
+   APP.JS - MOTOR SÚPER APP BÁSCULA POS & AUTOPAGO QR SUICHE 7B
    ========================================================== */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, query, where, getDocs, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, query, where, getDocs, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAsBnDGC_E_oSoKrewTbmkrmw2JAjdcalU",
@@ -17,15 +17,31 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Estado Global
+// Estado Global y Persistencia Segura
 let tasaBCV = parseFloat(localStorage.getItem('bascula_tasa_bcv')) || 36.50;
-// Hash SHA-256 por defecto de "1234"
+// Hash SHA-256 de "1234"
 let claveAdminHash = localStorage.getItem('bascula_clave_hash') || "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4";
 let logoUrl = localStorage.getItem('bascula_logo_url') || "https://cdn-icons-png.flaticon.com/512/1046/1046857.png";
+
+// Datos Bancarios para el Motor QR Suiche 7B
+let datosPagoMovil = JSON.parse(localStorage.getItem('bascula_datos_pm')) || {
+  banco: "0102 - Banco de Venezuela",
+  rif: "V12345678",
+  telefono: "04121234567"
+};
+
 let pesoBrutoGramos = 0;
 let taraGramos = 0;
 window.carrito = [];
 let productoTemp = null;
+let cantidadUnidadesTemp = 1;
+let metodoPagoActual = 'pagomovil'; // 'pagomovil' | 'divisas'
+let unsubscribePagosVivo = null;
+let numpadCallback = null;
+let numpadMaxLen = 6;
+let numpadEsSecreto = false;
+let numpadValorActual = "";
+
 let categoriaSeleccionada = "";
 let temporizadorInactividad = null;
 let datosUltimoTicket = null;
@@ -33,19 +49,20 @@ let ventasHistorial = JSON.parse(localStorage.getItem('bascula_ventas_historial'
 let imagenesBase64Temp = { add: null, edit: null };
 const hoyStr = new Date().toISOString().split('T')[0];
 
+// Catálogo Predeterminado (Híbrido: Peso y Unidad)
 const productosPredeterminados = [
-  { id: 1, nombre: 'Manzana Red', categoria: 'Frutería', precioKg: 2.50, stockGramos: 15000, codigoBarras: '7591001', diasVida: 7, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300' },
-  { id: 2, nombre: 'Cambur / Banana', categoria: 'Frutería', precioKg: 1.20, stockGramos: 8000, codigoBarras: '7591002', diasVida: 3, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300' },
-  { id: 3, nombre: 'Zanahoria', categoria: 'Verdulería', precioKg: 1.80, stockGramos: 20000, codigoBarras: '7591003', diasVida: 8, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1598170845058-12ef4a457939?w=300' },
-  { id: 4, nombre: 'Tomate', categoria: 'Verdulería', precioKg: 3.00, stockGramos: 12000, codigoBarras: '7591004', diasVida: 4, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=300' },
-  { id: 5, nombre: 'Maní Salado (Bolsa)', categoria: 'Manicería', precioKg: 4.00, stockGramos: 5000, codigoBarras: '7591005', diasVida: 30, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1567892568620-80d8591325d7?w=300' },
-  { id: 6, nombre: 'Caraotas Negras', categoria: 'Granos', precioKg: 2.20, stockGramos: 30000, codigoBarras: '7591006', diasVida: 60, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1551462147-ff29053bfc14?w=300' },
-  { id: 7, nombre: 'Queso Paisa', categoria: 'Charcutería', precioKg: 6.50, stockGramos: 6000, codigoBarras: '7591007', diasVida: 10, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=300' }
+  { id: 1, nombre: 'Manzana Red', categoria: 'Frutería', tipoVenta: 'peso', precioKg: 2.50, stockGramos: 15000, codigoBarras: '7591001', diasVida: 7, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300' },
+  { id: 2, nombre: 'Cambur / Banana', categoria: 'Frutería', tipoVenta: 'peso', precioKg: 1.20, stockGramos: 8000, codigoBarras: '7591002', diasVida: 3, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300' },
+  { id: 3, nombre: 'Zanahoria Fresca', categoria: 'Verdulería', tipoVenta: 'peso', precioKg: 1.80, stockGramos: 20000, codigoBarras: '7591003', diasVida: 8, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1598170845058-12ef4a457939?w=300' },
+  { id: 4, nombre: 'Tomate Perita', categoria: 'Verdulería', tipoVenta: 'peso', precioKg: 3.00, stockGramos: 12000, codigoBarras: '7591004', diasVida: 4, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=300' },
+  { id: 5, nombre: 'Maní Salado Empaque 250g', categoria: 'Manicería', tipoVenta: 'unidad', precioKg: 1.50, stockGramos: 40, codigoBarras: '7591005', diasVida: 45, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1567892568620-80d8591325d7?w=300' },
+  { id: 6, nombre: 'Caraotas Negras', categoria: 'Granos', tipoVenta: 'peso', precioKg: 2.20, stockGramos: 30000, codigoBarras: '7591006', diasVida: 60, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1551462147-ff29053bfc14?w=300' },
+  { id: 7, nombre: 'Queso Paisa Pasteurizado', categoria: 'Charcutería', tipoVenta: 'peso', precioKg: 6.50, stockGramos: 6000, codigoBarras: '7591007', diasVida: 10, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=300' }
 ];
 
 let productos = JSON.parse(localStorage.getItem('bascula_productos')) || productosPredeterminados;
 
-// Audio Sintetizado Web Audio API
+// Sintetizador de Sonido Web Audio API
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 function reproducirSonido(tipo) {
   if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -56,16 +73,16 @@ function reproducirSonido(tipo) {
 
   if (tipo === 'beep') {
     osc.type = 'sine'; osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.14);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.14);
   } else if (tipo === 'balanza') {
-    osc.type = 'triangle'; osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(659.25, audioCtx.currentTime + 0.1);
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(659.25, audioCtx.currentTime + 0.12);
     gain.gain.setValueAtTime(0.08, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
     osc.start(); osc.stop(audioCtx.currentTime + 0.2);
   } else if (tipo === 'scan') {
-    osc.type = 'sine'; osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+    osc.type = 'sine'; osc.frequency.setValueAtTime(1250, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.12);
   }
 }
 
@@ -77,52 +94,12 @@ function escaparHTML(str) {
   );
 }
 
-// Hash SHA-256 para PIN seguro
+// Cifrado SHA-256 para PIN Administrador
 async function calcularHashSHA256(mensaje) {
   const msgBuffer = new TextEncoder().encode(mensaje);
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// Compresor de imágenes de Galería a Base64 ligero (250x250 JPEG 0.7)
-function comprimirImagenGaleria(file, modo) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const MAX_SIZE = 260;
-      let width = img.width;
-      let height = img.height;
-
-      if (width > height) {
-        if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
-      } else {
-        if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
-      }
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-
-      if (modo === 'add') {
-        imagenesBase64Temp.add = dataUrl;
-        document.getElementById('prev-add-img').src = dataUrl;
-        document.getElementById('prev-add-box').style.display = 'block';
-        document.getElementById('adm-img-url').value = '';
-      } else {
-        imagenesBase64Temp.edit = dataUrl;
-        document.getElementById('prev-edit-img').src = dataUrl;
-        document.getElementById('edit-prod-img-url').value = '';
-      }
-      mostrarToast("Imagen optimizada y cargada", "exito");
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
 }
 
 // Notificaciones Toast Animadas con Anime.js
@@ -137,8 +114,8 @@ function mostrarToast(mensaje, tipo = 'exito') {
   anime({
     targets: toast,
     opacity: [0, 1],
-    translateY: [-20, 0],
-    duration: 400,
+    translateX: [30, 0],
+    duration: 380,
     easing: 'easeOutExpo'
   });
 
@@ -146,49 +123,199 @@ function mostrarToast(mensaje, tipo = 'exito') {
     anime({
       targets: toast,
       opacity: [1, 0],
-      translateY: [0, -20],
-      duration: 300,
+      translateX: [0, 30],
+      duration: 280,
       easing: 'easeInExpo',
       complete: () => toast.remove()
     });
   }, 3200);
 }
 
-// Registro de Service Worker para PWA en GitHub
+// ==========================================================
+// MOTOR GENERADOR DE CÓDIGO QR BANCARIO SUICHE 7B (NIVEL H)
+// ==========================================================
+function dibujarQRSuiche7B(canvasId, payloadTexto, incluirLogoSuiche = true) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || typeof qrcode === 'undefined') return;
+  const ctx = canvas.getContext('2d');
+  const size = canvas.width;
+
+  // Nivel H (30% de corrección de errores) para soportar el emblema Suiche 7B en el centro
+  const qr = qrcode(0, 'H');
+  qr.addData(payloadTexto);
+  qr.make();
+
+  const moduleCount = qr.getModuleCount();
+  const margin = Math.floor(size * 0.06);
+  const availableSize = size - margin * 2;
+  const tileW = availableSize / moduleCount;
+  const tileH = availableSize / moduleCount;
+
+  // Fondo blanco limpio
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, size, size);
+
+  // Dibujar módulos del QR
+  ctx.fillStyle = '#000000';
+  for (let row = 0; row < moduleCount; row++) {
+    for (let col = 0; col < moduleCount; col++) {
+      if (qr.isDark(row, col)) {
+        const x = Math.round(margin + col * tileW);
+        const y = Math.round(margin + row * tileH);
+        const w = Math.ceil((col + 1) * tileW) - Math.floor(col * tileW);
+        const h = Math.ceil((row + 1) * tileH) - Math.floor(row * tileH);
+        ctx.fillRect(x, y, w, h);
+      }
+    }
+  }
+
+  // Estampar emblema central estilo Suiche 7B (como en la imagen de referencia)
+  if (incluirLogoSuiche) {
+    const boxSize = Math.floor(size * 0.24);
+    const boxX = Math.floor((size - boxSize) / 2);
+    const boxY = Math.floor((size - boxSize) / 2);
+
+    // Recuadro blanco protector central
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.roundRect(boxX - 3, boxY - 3, boxSize + 6, boxSize + 6, 8);
+    ctx.fill();
+
+    // Cabecera "SUICHE"
+    ctx.fillStyle = '#111827';
+    ctx.font = `900 ${Math.floor(boxSize * 0.19)}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText('SUICHE', size / 2, boxY + boxSize * 0.22);
+
+    // Emblema redondeado multicolor 7B (4 franjas: Morado, Azul, Verde, Ámbar)
+    const badgeY = boxY + boxSize * 0.28;
+    const badgeH = boxSize * 0.68;
+    const badgeW = boxSize * 0.88;
+    const badgeX = (size - badgeW) / 2;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 7);
+    ctx.clip();
+
+    const coloresSuiche = ['#9333ea', '#0284c7', '#16a34a', '#ea580c'];
+    const stripeW = badgeW / 4;
+    coloresSuiche.forEach((color, idx) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(badgeX + idx * stripeW, badgeY, stripeW + 1, badgeH);
+    });
+
+    // Texto "7B" en blanco de alto contraste en el centro del emblema
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `900 ${Math.floor(badgeH * 0.68)}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('7B', size / 2, badgeY + badgeH / 2 + 1);
+    ctx.restore();
+  }
+}
+
+// ==========================================================
+// TECLADO NUMÉRICO TÁCTIL INTEGRADO (NUMPAD)
+// ==========================================================
+function abrirNumpad({ titulo, maxLen = 6, secreto = false, valorInicial = "", onConfirm }) {
+  numpadValorActual = String(valorInicial || "");
+  numpadMaxLen = maxLen;
+  numpadEsSecreto = secreto;
+  numpadCallback = onConfirm;
+
+  document.getElementById('numpad-titulo').innerText = titulo;
+  actualizarVisorNumpad();
+  abrirModal('modal-numpad');
+}
+
+function actualizarVisorNumpad() {
+  const visor = document.getElementById('numpad-display');
+  if (numpadEsSecreto) {
+    visor.value = "•".repeat(numpadValorActual.length);
+  } else {
+    visor.value = numpadValorActual || "—";
+  }
+}
+
+function procesarTeclaNumpad(key) {
+  reproducirSonido('beep');
+  if (key === 'C') {
+    numpadValorActual = "";
+  } else if (key === 'BACK') {
+    numpadValorActual = numpadValorActual.slice(0, -1);
+  } else if (numpadValorActual.length < numpadMaxLen) {
+    numpadValorActual += key;
+  }
+  actualizarVisorNumpad();
+}
+
+// Compresor de imágenes de Galería en Canvas
+function comprimirImagenGaleria(file, modo) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const MAX_SIZE = 260;
+      let width = img.width;
+      let height = img.height;
+      if (width > height && width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+      else if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.78);
+
+      if (modo === 'add') {
+        imagenesBase64Temp.add = dataUrl;
+        document.getElementById('prev-add-img').src = dataUrl;
+        document.getElementById('prev-add-box').style.display = 'block';
+        document.getElementById('adm-img-url').value = '';
+      } else {
+        imagenesBase64Temp.edit = dataUrl;
+        document.getElementById('prev-edit-img').src = dataUrl;
+        document.getElementById('edit-prod-img-url').value = '';
+      }
+      mostrarToast("Imagen optimizada lista", "exito");
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Registro de Service Worker para PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   });
 }
 
-// Inicialización DOM
+// ==========================================================
+// INICIALIZACIÓN DE EVENTOS DOM
+// ==========================================================
 document.addEventListener('DOMContentLoaded', () => {
   aplicarLogo();
   actualizarDisplaysTasa();
   actualizarDisplayPeso();
+  cargarDatosPagoMovilUI();
   obtenerTasaBCVOnline();
   iniciarMonitoreoInactividad();
   actualizarReporteAdmin();
   document.getElementById('adm-fecha-ingreso').value = hoyStr;
-  
-  if (localStorage.getItem('bascula_modo_oscuro') === 'true') {
-    document.body.classList.add('dark-mode');
-    document.getElementById('btn-tema').innerText = '☀️';
-  }
 
-  // Animación continua suave del logo de bienvenida con Anime.js
   anime({
     targets: '#img-logo-bienvenida',
-    translateY: [-8, 8],
+    translateY: [-6, 6],
     direction: 'alternate',
     loop: true,
     easing: 'easeInOutSine',
-    duration: 2500
+    duration: 2400
   });
 
-  // Listeners principales
+  // Navegación y Kiosco
   document.getElementById('btn-comenzar').addEventListener('click', iniciarKiosco);
-  document.getElementById('btn-tema').addEventListener('click', toggleModoOscuro);
   document.getElementById('btn-simular-peso').addEventListener('click', () => {
     document.getElementById('input-peso-sim').value = pesoBrutoGramos;
     abrirModal('modal-peso-sim');
@@ -196,40 +323,86 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-tara').addEventListener('click', aplicarTara);
   document.getElementById('btn-volver').addEventListener('click', mostrarCategorias);
   document.getElementById('btn-cart-float').addEventListener('click', abrirCarrito);
-  document.getElementById('btn-acceso-admin').addEventListener('click', () => abrirModal('modal-pin'));
+
+  // Acceso Admin usando el Numpad Táctil Integrado
+  document.getElementById('btn-acceso-admin').addEventListener('click', () => {
+    abrirNumpad({
+      titulo: "PIN de Administrador",
+      maxLen: 8,
+      secreto: true,
+      onConfirm: (pin) => verificarPinAdmin(pin)
+    });
+  });
+
+  // Conexiones Hardware (BLE + USB Serial)
   document.getElementById('btn-conectar-ble').addEventListener('click', conectarBLE);
+  document.getElementById('btn-conectar-usb').addEventListener('click', conectarUSBSerial);
+
+  // Tasas y Configuración Admin
   document.getElementById('btn-actualizar-tasa-header').addEventListener('click', obtenerTasaBCVOnline);
   document.getElementById('btn-sincronizar').addEventListener('click', obtenerTasaBCVOnline);
   document.getElementById('btn-guardar-tasa').addEventListener('click', guardarTasaManual);
+  document.getElementById('btn-guardar-pm').addEventListener('click', guardarDatosPagoMovil);
   document.getElementById('btn-actualizar-logo').addEventListener('click', actualizarLogo);
   document.getElementById('btn-guardar-prod').addEventListener('click', guardarProductoAdmin);
   document.getElementById('btn-guardar-edit').addEventListener('click', guardarCambiosEdicion);
   document.getElementById('btn-cambiar-clave').addEventListener('click', cambiarClaveAdmin);
-  document.getElementById('btn-verificar-pin').addEventListener('click', verificarPinAdmin);
   document.getElementById('btn-confirmar-peso-sim').addEventListener('click', aplicarPesoSimulado);
+
+  // Modal Confirmación Híbrida (Peso / Unidades)
+  document.getElementById('btn-restar-unidad').addEventListener('click', () => ajustarUnidadesModal(-1));
+  document.getElementById('btn-sumar-unidad').addEventListener('click', () => ajustarUnidadesModal(1));
   document.getElementById('btn-confirmar-agregar').addEventListener('click', confirmarAgregar);
+
+  // Carrito, Tabs de Pago y Numpad de Referencia
+  document.getElementById('tab-pagomovil').addEventListener('click', () => cambiarMetodoPago('pagomovil'));
+  document.getElementById('tab-divisas').addEventListener('click', () => cambiarMetodoPago('divisas'));
+  
+  const abrirNumpadRef = () => {
+    abrirNumpad({
+      titulo: "Últimos 6 Dígitos de Referencia",
+      maxLen: 6,
+      secreto: false,
+      valorInicial: document.getElementById('ref-pago-input').value,
+      onConfirm: (val) => {
+        document.getElementById('ref-pago-input').value = val;
+      }
+    });
+  };
+  document.getElementById('ref-pago-input').addEventListener('click', abrirNumpadRef);
+  document.getElementById('btn-abrir-numpad-ref').addEventListener('click', abrirNumpadRef);
   document.getElementById('btn-validar-pago').addEventListener('click', validarPagoFirestore);
   document.getElementById('btn-ticket-pendiente').addEventListener('click', () => generarTicket('PENDIENTE'));
+
+  // Ticket y Exportaciones
   document.getElementById('btn-imprimir-bt').addEventListener('click', imprimirTicketBluetooth);
   document.getElementById('btn-repetir-pesaje').addEventListener('click', repetirPesaje);
   document.getElementById('btn-finalizar-salir').addEventListener('click', reiniciarTodo);
   document.getElementById('btn-exportar-ventas').addEventListener('click', exportarVentasCSV);
   document.getElementById('btn-exportar-catalogo').addEventListener('click', exportarProductosCSV);
 
-  // Botones de Galería en Admin (Crear y Editar)
+  // Galería Admin
   document.getElementById('btn-galeria-add').addEventListener('click', () => document.getElementById('img-gallery-add').click());
   document.getElementById('img-gallery-add').addEventListener('change', (e) => comprimirImagenGaleria(e.target.files[0], 'add'));
   document.getElementById('btn-galeria-edit').addEventListener('click', () => document.getElementById('img-gallery-edit').click());
   document.getElementById('img-gallery-edit').addEventListener('change', (e) => comprimirImagenGaleria(e.target.files[0], 'edit'));
+
+  // Teclas del Numpad Táctil
+  document.querySelectorAll('.numpad-key').forEach(btn => {
+    btn.addEventListener('click', () => procesarTeclaNumpad(btn.dataset.key));
+  });
+  document.getElementById('btn-numpad-ok').addEventListener('click', () => {
+    cerrarModal('modal-numpad');
+    if (typeof numpadCallback === 'function') numpadCallback(numpadValorActual);
+  });
 
   // Categorías
   document.querySelectorAll('.card-categoria').forEach(card => {
     card.addEventListener('click', () => filtrarPorCategoria(card.dataset.categoria));
   });
 
-  // Buscador optimizado con Lodash debounce
-  const inputBuscar = document.getElementById('input-buscar');
-  inputBuscar.addEventListener('input', _.debounce(buscarProductosDirecto, 220));
+  // Buscador con Lodash Debounce
+  document.getElementById('input-buscar').addEventListener('input', _.debounce(buscarProductosDirecto, 200));
 
   // Chips de peso rápido
   document.querySelectorAll('.chip-peso').forEach(chip => {
@@ -238,12 +411,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Cierre de modales
+  // Botones de cerrar modales
   document.querySelectorAll('[data-close]').forEach(btn => {
-    btn.addEventListener('click', () => cerrarModal(btn.getAttribute('data-close')));
+    btn.addEventListener('click', () => {
+      const targetId = btn.getAttribute('data-close');
+      if (targetId === 'modal-carrito' && unsubscribePagosVivo) {
+        unsubscribePagosVivo();
+        unsubscribePagosVivo = null;
+      }
+      cerrarModal(targetId);
+    });
   });
 
-  // Atajos de teclado
+  // Atajos de teclado físico (F4 y Escape)
   window.addEventListener('keydown', (e) => {
     if (e.key === 'F4') {
       e.preventDefault();
@@ -256,9 +436,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.addEventListener('focus', () => obtenerTasaBCVOnline());
 
+// ==========================================================
+// SINCRONIZACIÓN TASA BCV Y CONFIGURACIÓN COMERCIO
+// ==========================================================
 async function obtenerTasaBCVOnline() {
   const btn = document.getElementById('btn-sincronizar');
-  if (btn) btn.innerText = "⏳ Consultando Tasa Al Momento...";
+  if (btn) btn.innerText = "Consultando tasa oficial en vivo...";
   try {
     const resPrimary = await fetch('https://rates.dolarvzla.com/bcv/current.json', { cache: 'no-cache' });
     if (resPrimary.ok) {
@@ -269,21 +452,22 @@ async function obtenerTasaBCVOnline() {
         return;
       }
     }
-    throw new Error("Fallback a DolarApi");
+    throw new Error("Fallback");
   } catch (err) {
     try {
       const response = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { cache: 'no-cache' });
-      if (!response.ok) throw new Error("Error HTTP");
-      const data = await response.json();
-      let tasaAlMomento = data.promedio || data.precio;
-      if (tasaAlMomento && !isNaN(tasaAlMomento) && tasaAlMomento > 0) {
-        guardarTasaEnStorage(parseFloat(tasaAlMomento));
+      if (response.ok) {
+        const data = await response.json();
+        let tasaAlMomento = data.promedio || data.precio;
+        if (tasaAlMomento && !isNaN(tasaAlMomento) && tasaAlMomento > 0) {
+          guardarTasaEnStorage(parseFloat(tasaAlMomento));
+        }
       }
     } catch (e) {
-      console.warn("Usando tasa guardada en caché local.");
+      console.warn("Operando con tasa BCV local.");
     }
   } finally {
-    if (btn) btn.innerText = "🔄 Sincronizar Tasa BCV en Vivo (DolarApi / Rates)";
+    if (btn) btn.innerText = "Sincronizar Tasa BCV en Tiempo Real";
   }
 }
 
@@ -298,12 +482,39 @@ function guardarTasaManual() {
   let val = parseFloat(document.getElementById('adm-tasa').value);
   if (val && val > 0) {
     guardarTasaEnStorage(val);
-    mostrarToast("Tasa BCV actualizada manualmente", "exito");
+    mostrarToast("Tasa BCV actualizada", "exito");
   } else {
-    mostrarToast("Ingresa un valor numérico válido", "error");
+    mostrarToast("Monto de tasa inválido", "error");
   }
 }
 
+function cargarDatosPagoMovilUI() {
+  document.getElementById('lbl-banco-comercio').innerText = datosPagoMovil.banco;
+  document.getElementById('lbl-rif-comercio').innerText = datosPagoMovil.rif;
+  document.getElementById('lbl-tel-comercio').innerText = datosPagoMovil.telefono;
+
+  document.getElementById('adm-pm-banco').value = datosPagoMovil.banco;
+  document.getElementById('adm-pm-rif').value = datosPagoMovil.rif;
+  document.getElementById('adm-pm-tel').value = datosPagoMovil.telefono;
+}
+
+function guardarDatosPagoMovil() {
+  const banco = document.getElementById('adm-pm-banco').value.trim();
+  const rif = document.getElementById('adm-pm-rif').value.trim();
+  const telefono = document.getElementById('adm-pm-tel').value.trim();
+  if (!banco || !rif || !telefono) {
+    mostrarToast("Completa todos los datos bancarios", "error");
+    return;
+  }
+  datosPagoMovil = { banco, rif, telefono };
+  localStorage.setItem('bascula_datos_pm', JSON.stringify(datosPagoMovil));
+  cargarDatosPagoMovilUI();
+  mostrarToast("Datos de Pago Móvil QR guardados", "exito");
+}
+
+// ==========================================================
+// GESTIÓN DE MODALES Y BALANZA
+// ==========================================================
 function abrirModal(id) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -312,10 +523,10 @@ function abrirModal(id) {
     el.classList.add('show');
     anime({
       targets: `#${id} .modal-contenido`,
-      scale: [0.85, 1],
+      scale: [0.88, 1],
       opacity: [0, 1],
-      duration: 320,
-      easing: 'easeOutBack(1.2)'
+      duration: 300,
+      easing: 'easeOutBack(1.15)'
     });
   });
 }
@@ -325,21 +536,15 @@ function cerrarModal(id) {
   if (!el) return;
   anime({
     targets: `#${id} .modal-contenido`,
-    scale: [1, 0.9],
+    scale: [1, 0.92],
     opacity: [1, 0],
-    duration: 220,
+    duration: 200,
     easing: 'easeInQuad',
     complete: () => {
       el.classList.remove('show');
       el.style.display = 'none';
     }
   });
-}
-
-function toggleModoOscuro() {
-  const esOscuro = document.body.classList.toggle('dark-mode');
-  localStorage.setItem('bascula_modo_oscuro', esOscuro);
-  document.getElementById('btn-tema').innerText = esOscuro ? '☀️' : '🌙';
 }
 
 function aplicarLogo() {
@@ -354,8 +559,7 @@ function actualizarDisplaysTasa() {
 }
 
 function obtenerPesoNeto() {
-  let neto = pesoBrutoGramos - taraGramos;
-  return neto < 0 ? 0 : neto;
+  return Math.max(0, pesoBrutoGramos - taraGramos);
 }
 
 function actualizarDisplayPeso() {
@@ -367,9 +571,9 @@ function actualizarDisplayPeso() {
     targets: { val: valorAnterior },
     val: valorNuevo,
     round: 1,
-    duration: 350,
+    duration: 320,
     easing: 'easeOutQuad',
-    update: function(anim) {
+    update: (anim) => {
       elPeso.innerText = anim.animations[0].currentValue;
     }
   });
@@ -379,23 +583,23 @@ function aplicarTara() {
   taraGramos = pesoBrutoGramos;
   actualizarDisplayPeso();
   reproducirSonido('balanza');
-  mostrarToast("Tara aplicada (0g establecidos)", "exito");
+  mostrarToast(`Tara fijada en ${taraGramos}g (Neto: 0g)`, "exito");
 }
 
 function aplicarPesoSimulado() {
   let val = parseInt(document.getElementById('input-peso-sim').value);
   if (!isNaN(val) && val >= 0) {
-    document.getElementById('estado-peso-lbl').innerText = "🟡 AJUSTANDO...";
+    document.getElementById('estado-peso-lbl').innerHTML = `<span class="dot-status" style="background:#f59e0b;"></span> ESTABILIZANDO...`;
     setTimeout(() => {
       pesoBrutoGramos = val;
       actualizarDisplayPeso();
       reproducirSonido('balanza');
-      document.getElementById('estado-peso-lbl').innerText = "🟢 PESO ESTABLE";
+      document.getElementById('estado-peso-lbl').innerHTML = `<span class="dot-status"></span> PESO ESTABLE`;
       cerrarModal('modal-peso-sim');
-      mostrarToast(`Peso en balanza: ${val}g`, "exito");
-    }, 200);
+      mostrarToast(`Balanza: ${val}g`, "exito");
+    }, 220);
   } else {
-    mostrarToast("Ingresa un peso en gramos válido", "error");
+    mostrarToast("Ingresa un peso válido", "error");
   }
 }
 
@@ -407,27 +611,27 @@ function iniciarMonitoreoInactividad() {
 function resetearTemporizador() {
   clearTimeout(temporizadorInactividad);
   temporizadorInactividad = setTimeout(() => {
-    if (document.getElementById('pantalla-kiosco').style.display === 'flex') reiniciarTodo();
-  }, 90000);
+    if (document.getElementById('pantalla-kiosco').style.display === 'flex' && window.carrito.length === 0) {
+      reiniciarTodo();
+    }
+  }, 120000);
 }
 
+// ==========================================================
+// CATÁLOGO Y COMPRA HÍBRIDA (PESO EN GRAMOS O POR UNIDAD)
+// ==========================================================
 function iniciarKiosco() {
   anime({
     targets: '#pantalla-inicio',
     opacity: [1, 0],
-    scale: [1, 1.04],
-    duration: 350,
+    scale: [1, 1.03],
+    duration: 320,
     easing: 'easeInOutQuad',
     complete: () => {
       document.getElementById('pantalla-inicio').style.display = 'none';
       const kiosco = document.getElementById('pantalla-kiosco');
       kiosco.style.display = 'flex';
-      anime({
-        targets: kiosco,
-        opacity: [0, 1],
-        duration: 400,
-        easing: 'easeOutQuad'
-      });
+      anime({ targets: kiosco, opacity: [0, 1], duration: 380, easing: 'easeOutQuad' });
       mostrarCategorias();
     }
   });
@@ -444,10 +648,10 @@ function mostrarCategorias() {
   anime({
     targets: '.card-categoria',
     opacity: [0, 1],
-    translateY: [20, 0],
-    delay: anime.stagger(55),
+    translateY: [18, 0],
+    delay: anime.stagger(50),
     easing: 'easeOutExpo',
-    duration: 450
+    duration: 420
   });
 }
 
@@ -458,7 +662,7 @@ function filtrarPorCategoria(cat) {
   document.getElementById('btn-volver').style.display = 'flex';
   document.getElementById('vista-categorias').style.display = 'none';
   document.getElementById('vista-productos').style.display = 'grid';
-  renderizarProductosGrid(productos.filter(p => p.categoria === cat || (!p.categoria && cat === 'Frutería')));
+  renderizarProductosGrid(productos.filter(p => p.categoria === cat));
 }
 
 function buscarProductosDirecto() {
@@ -500,11 +704,13 @@ function renderizarProductosGrid(lista) {
   const grid = document.getElementById('vista-productos');
   grid.innerHTML = '';
   if (lista.length === 0) {
-    grid.innerHTML = '<p style="grid-column: 1/-1; text-align:center; padding:30px; color:white; font-weight:700;">No se encontraron productos.</p>';
+    grid.innerHTML = '<p style="grid-column: 1/-1; text-align:center; padding:30px; color:var(--text-muted); font-weight:700;">No se encontraron productos.</p>';
     return;
   }
 
   lista.forEach(p => {
+    const esPorUnidad = p.tipoVenta === 'unidad';
+    const sufijoUnidad = esPorUnidad ? '/unid' : '/kg';
     const estadoOferta = calcularEstadoOferta(p);
     let precioEfectivo = estadoOferta.precioFinal;
     let precioBs = precioEfectivo * tasaBCV;
@@ -512,12 +718,13 @@ function renderizarProductosGrid(lista) {
     let badgeHtml = estadoOferta.descuento > 0 ? `<div class="${estadoOferta.descuento === 50 ? 'badge-remate' : 'badge-oferta'}">${estadoOferta.etiqueta}</div>` : '';
     let barcodeHtml = p.codigoBarras ? `<div class="badge-barcode">#${escaparHTML(p.codigoBarras)}</div>` : '';
 
-    let stockGramos = p.stockGramos !== undefined ? p.stockGramos : 10000;
-    let stockHtml = stockGramos <= 0 
+    let stockVal = p.stockGramos !== undefined ? p.stockGramos : 10000;
+    let stockTexto = esPorUnidad ? `${stockVal} unid.` : `${(stockVal / 1000).toFixed(1)}kg`;
+    let stockHtml = stockVal <= 0 
       ? `<div class="badge-stock stock-out">AGOTADO</div>` 
-      : stockGramos < 2000 
-        ? `<div class="badge-stock stock-low">Quedan ${(stockGramos/1000).toFixed(1)}kg</div>` 
-        : `<div class="badge-stock stock-ok">Stock: ${(stockGramos/1000).toFixed(1)}kg</div>`;
+      : (esPorUnidad ? stockVal < 5 : stockVal < 2000)
+        ? `<div class="badge-stock stock-low">Quedan ${stockTexto}</div>` 
+        : `<div class="badge-stock stock-ok">Disponible: ${stockTexto}</div>`;
 
     const card = document.createElement('div');
     card.className = 'card-producto';
@@ -527,8 +734,8 @@ function renderizarProductosGrid(lista) {
       <img src="${escaparHTML(p.img)}" alt="${escaparHTML(p.nombre)}" onerror="this.src='https://via.placeholder.com/200?text=Producto'">
       <h4>${escaparHTML(p.nombre)}</h4>
       <div>
-        <div class="precio-usd">$${precioEfectivo.toFixed(2)} /kg ${estadoOferta.descuento > 0 ? `<small class="precio-tachado">$${p.precioKg.toFixed(2)}</small>` : ''}</div>
-        <div class="precio-bs">Bs. ${precioBs.toFixed(2)} /kg</div>
+        <div class="precio-usd">$${precioEfectivo.toFixed(2)} ${sufijoUnidad} ${estadoOferta.descuento > 0 ? `<small class="precio-tachado">$${p.precioKg.toFixed(2)}</small>` : ''}</div>
+        <div class="precio-bs">Bs. ${precioBs.toFixed(2)} ${sufijoUnidad}</div>
         ${stockHtml}
       </div>
     `;
@@ -539,40 +746,73 @@ function renderizarProductosGrid(lista) {
   anime({
     targets: '.card-producto',
     opacity: [0, 1],
-    scale: [0.92, 1],
-    delay: anime.stagger(35),
+    scale: [0.94, 1],
+    delay: anime.stagger(30),
     easing: 'easeOutExpo',
-    duration: 380
+    duration: 350
   });
 }
 
 function seleccionarProducto(id) {
-  let pesoNeto = obtenerPesoNeto();
-  if (pesoNeto <= 0) {
-    mostrarToast("⚖️ Primero coloque el producto en la balanza (peso mayor a 0g)", "aviso");
-    return;
-  }
-
   productoTemp = productos.find(p => p.id === id);
-  let stockGramos = productoTemp.stockGramos !== undefined ? productoTemp.stockGramos : 10000;
-  if (stockGramos <= 0) {
-    mostrarToast(`El producto "${productoTemp.nombre}" está AGOTADO`, "error");
+  if (!productoTemp) return;
+
+  const esPorUnidad = productoTemp.tipoVenta === 'unidad';
+  let stockDisponible = productoTemp.stockGramos !== undefined ? productoTemp.stockGramos : 10000;
+  if (stockDisponible <= 0) {
+    mostrarToast(`"${productoTemp.nombre}" está agotado en inventario`, "error");
     return;
   }
 
-  const estadoOferta = calcularEstadoOferta(productoTemp);
-  const subtotalUsd = (pesoNeto / 1000) * estadoOferta.precioFinal;
-  const subtotalBs = subtotalUsd * tasaBCV;
-  
+  let pesoNeto = obtenerPesoNeto();
+  if (!esPorUnidad && pesoNeto <= 0) {
+    mostrarToast("Coloque el producto sobre la balanza (peso mayor a 0g)", "aviso");
+    return;
+  }
+
+  cantidadUnidadesTemp = 1;
   document.getElementById('modal-prod-nombre').innerText = productoTemp.nombre;
   document.getElementById('modal-prod-img').src = productoTemp.img;
-  document.getElementById('modal-peso').innerText = pesoNeto;
-  document.getElementById('modal-descuento-info').innerText = estadoOferta.descuento > 0 ? `🔥 Oferta de Lote: ${estadoOferta.etiqueta}` : '';
 
+  if (esPorUnidad) {
+    document.getElementById('bloque-modo-peso').style.display = 'none';
+    document.getElementById('bloque-modo-unidad').style.display = 'block';
+    document.getElementById('val-unidades').innerText = cantidadUnidadesTemp;
+  } else {
+    document.getElementById('bloque-modo-peso').style.display = 'block';
+    document.getElementById('bloque-modo-unidad').style.display = 'none';
+    document.getElementById('modal-peso').innerText = pesoNeto;
+  }
+
+  recalcularSubtotalModal();
+  abrirModal('modal-confirmar');
+}
+
+function ajustarUnidadesModal(delta) {
+  if (!productoTemp) return;
+  let maxStock = productoTemp.stockGramos || 50;
+  let nuevaCant = cantidadUnidadesTemp + delta;
+  if (nuevaCant >= 1 && nuevaCant <= maxStock) {
+    cantidadUnidadesTemp = nuevaCant;
+    document.getElementById('val-unidades').innerText = cantidadUnidadesTemp;
+    reproducirSonido('beep');
+    recalcularSubtotalModal();
+  }
+}
+
+function recalcularSubtotalModal() {
+  if (!productoTemp) return;
+  const esPorUnidad = productoTemp.tipoVenta === 'unidad';
+  const estadoOferta = calcularEstadoOferta(productoTemp);
+  
+  let subtotalUsd = esPorUnidad 
+    ? cantidadUnidadesTemp * estadoOferta.precioFinal 
+    : (obtenerPesoNeto() / 1000) * estadoOferta.precioFinal;
+  let subtotalBs = subtotalUsd * tasaBCV;
+
+  document.getElementById('modal-descuento-info').innerText = estadoOferta.descuento > 0 ? `Promoción Activa: ${estadoOferta.etiqueta}` : '';
   document.getElementById('modal-subtotal-usd').innerText = subtotalUsd.toFixed(2);
   document.getElementById('modal-subtotal-bs').innerText = subtotalBs.toFixed(2);
-  
-  abrirModal('modal-confirmar');
 }
 
 function animarVueloAlCarrito(imgSrc) {
@@ -586,17 +826,17 @@ function animarVueloAlCarrito(imgSrc) {
   const clon = document.createElement('img');
   clon.src = imgSrc;
   clon.className = 'vuelo-item';
-  clon.style.left = `${rectOrigen.left + rectOrigen.width / 2 - 32}px`;
-  clon.style.top = `${rectOrigen.top + rectOrigen.height / 2 - 32}px`;
+  clon.style.left = `${rectOrigen.left + rectOrigen.width / 2 - 30}px`;
+  clon.style.top = `${rectOrigen.top + rectOrigen.height / 2 - 30}px`;
   document.body.appendChild(clon);
 
   anime({
     targets: clon,
-    left: rectDestino.left + 10,
-    top: rectDestino.top + 10,
+    left: rectDestino.left + 8,
+    top: rectDestino.top + 8,
     scale: [1, 0.2],
-    opacity: [1, 0.4],
-    duration: 650,
+    opacity: [1, 0.3],
+    duration: 600,
     easing: 'easeInOutCubic',
     complete: () => {
       clon.remove();
@@ -606,25 +846,31 @@ function animarVueloAlCarrito(imgSrc) {
 }
 
 function confirmarAgregar() {
+  if (!productoTemp) return;
+  const esPorUnidad = productoTemp.tipoVenta === 'unidad';
   let pesoNeto = obtenerPesoNeto();
-  if (pesoNeto <= 0 || !productoTemp) return;
+  if (!esPorUnidad && pesoNeto <= 0) return;
 
   const estadoOferta = calcularEstadoOferta(productoTemp);
-  const subtotalUsd = (pesoNeto / 1000) * estadoOferta.precioFinal;
+  const subtotalUsd = esPorUnidad 
+    ? cantidadUnidadesTemp * estadoOferta.precioFinal 
+    : (pesoNeto / 1000) * estadoOferta.precioFinal;
   const subtotalBs = subtotalUsd * tasaBCV;
 
   window.carrito.push({
     id: productoTemp.id,
     nombre: productoTemp.nombre + (estadoOferta.descuento > 0 ? ` (${estadoOferta.etiqueta})` : ''),
-    peso: pesoNeto,
-    subtotalUsd: subtotalUsd,
-    subtotalBs: subtotalBs
+    tipoVenta: esPorUnidad ? 'unidad' : 'peso',
+    peso: esPorUnidad ? 0 : pesoNeto,
+    unidades: esPorUnidad ? cantidadUnidadesTemp : 1,
+    subtotalUsd,
+    subtotalBs
   });
 
   reproducirSonido('beep');
   animarVueloAlCarrito(productoTemp.img);
   cerrarModal('modal-confirmar');
-  mostrarToast("Agregado al carrito", "exito");
+  mostrarToast("Producto añadido al carrito", "exito");
 }
 
 function actualizarCarritoBadge() {
@@ -632,32 +878,69 @@ function actualizarCarritoBadge() {
   badge.innerText = window.carrito.length;
   anime({
     targets: badge,
-    scale: [1, 1.45, 1],
-    duration: 400,
+    scale: [1, 1.4, 1],
+    duration: 380,
     easing: 'easeOutElastic(1, .6)'
   });
+}
+
+// ==========================================================
+// CARRITO, AUDITORÍA DE PESO, QR SUICHE 7B Y ESCUCHA EN VIVO
+// ==========================================================
+function cambiarMetodoPago(metodo) {
+  metodoPagoActual = metodo;
+  document.getElementById('tab-pagomovil').classList.toggle('active', metodo === 'pagomovil');
+  document.getElementById('tab-divisas').classList.toggle('active', metodo === 'divisas');
+  document.getElementById('panel-autopago-qr').style.display = metodo === 'pagomovil' ? 'block' : 'none';
+  document.getElementById('panel-pago-divisas').style.display = metodo === 'divisas' ? 'block' : 'none';
+  document.getElementById('badge-igtf-activo').style.display = metodo === 'divisas' ? 'inline' : 'none';
+  recalcularTotalesCarritoUI();
+}
+
+function recalcularTotalesCarritoUI() {
+  let baseUsd = window.carrito.reduce((acc, item) => acc + item.subtotalUsd, 0);
+  let baseBs = window.carrito.reduce((acc, item) => acc + item.subtotalBs, 0);
+
+  // Si paga en divisas efectivo, suma 3% de IGTF
+  let finalUsd = metodoPagoActual === 'divisas' ? baseUsd * 1.03 : baseUsd;
+  let finalBs = metodoPagoActual === 'divisas' ? baseBs * 1.03 : baseBs;
+
+  document.getElementById('cart-total-usd').innerText = finalUsd.toFixed(2);
+  document.getElementById('cart-total-bs').innerText = finalBs.toFixed(2);
+
+  // Generar el Código QR Bancario Suiche 7B con el monto exacto en Bs
+  const codigoBanco = datosPagoMovil.banco.slice(0, 4);
+  const payloadSuiche7B = JSON.stringify({
+    red: "SUICHE7B",
+    banco: codigoBanco,
+    id: datosPagoMovil.rif,
+    telefono: datosPagoMovil.telefono.replace(/\D/g, ''),
+    monto: finalBs.toFixed(2)
+  });
+  dibujarQRSuiche7B('qr-suiche-canvas', payloadSuiche7B, true);
 }
 
 function abrirCarrito() {
   const contenedor = document.getElementById('lista-carrito');
   contenedor.innerHTML = '';
-  let totalUsd = 0; let totalBs = 0;
+  let pesoEsperadoTotal = 0;
 
   if (window.carrito.length === 0) {
     contenedor.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:15px; font-weight:700;">El carrito está vacío</p>';
   } else {
     window.carrito.forEach((item, index) => {
-      totalUsd += item.subtotalUsd; totalBs += item.subtotalBs;
+      pesoEsperadoTotal += item.peso || 0;
+      const detalleCant = item.tipoVenta === 'unidad' ? `${item.unidades} unid.` : `${item.peso}g`;
       const row = document.createElement('div');
       row.style.cssText = "display:flex; justify-content:space-between; margin-bottom:10px; align-items:center;";
       row.innerHTML = `
         <div>
-          <b>${escaparHTML(item.nombre)}</b> <small style="color:var(--text-muted);">(${item.peso}g)</small>
-          <div style="font-size:0.85rem; color:var(--text-muted); font-weight:700;">Bs. ${item.subtotalBs.toFixed(2)}</div>
+          <b>${escaparHTML(item.nombre)}</b> <small style="color:var(--text-muted);">(${detalleCant})</small>
+          <div style="font-size:0.82rem; color:var(--text-muted); font-weight:700;">Bs. ${item.subtotalBs.toFixed(2)}</div>
         </div>
         <div style="text-align:right;">
-          <b style="color:var(--primary); font-size:1.05rem;">$${item.subtotalUsd.toFixed(2)}</b>
-          <br><button class="btn-eliminar-item" style="background:none; border:none; color:#ef4444; font-size:0.8rem; font-weight:800; cursor:pointer;">Eliminar</button>
+          <b style="color:var(--primary); font-size:1rem;">$${item.subtotalUsd.toFixed(2)}</b>
+          <br><button class="btn-eliminar-item" style="background:none; border:none; color:var(--danger); font-size:0.78rem; font-weight:800; cursor:pointer;">Quitar</button>
         </div>
       `;
       row.querySelector('.btn-eliminar-item').addEventListener('click', () => eliminarDelCarrito(index));
@@ -665,14 +948,17 @@ function abrirCarrito() {
     });
   }
 
-  document.getElementById('cart-total-usd').innerText = totalUsd.toFixed(2);
-  document.getElementById('cart-total-bs').innerText = totalBs.toFixed(2);
-  
+  // Auditoría Antirrobo de peso en bolsa
+  document.getElementById('peso-esperado-cart').innerText = `${pesoEsperadoTotal}g`;
+  document.getElementById('peso-actual-cart').innerText = `${obtenerPesoNeto()}g`;
+
   const msgDiv = document.getElementById('msg-autopago');
   if (msgDiv) { msgDiv.innerText = ''; msgDiv.className = ''; }
   document.getElementById('ref-pago-input').value = '';
-  
+
+  recalcularTotalesCarritoUI();
   abrirModal('modal-carrito');
+  iniciarEscuchaPagosEnVivo();
 }
 
 function eliminarDelCarrito(index) {
@@ -681,19 +967,55 @@ function eliminarDelCarrito(index) {
   abrirCarrito();
 }
 
+// Escucha Automática en Tiempo Real con Firestore onSnapshot
+function iniciarEscuchaPagosEnVivo() {
+  if (unsubscribePagosVivo) {
+    unsubscribePagosVivo();
+    unsubscribePagosVivo = null;
+  }
+  if (window.carrito.length === 0) return;
+
+  let totalBsRequerido = window.carrito.reduce((acc, item) => acc + item.subtotalBs, 0);
+  const pagosRef = collection(db, "verificacion_pagos");
+  const q = query(pagosRef, where("estado", "==", "PENDIENTE"));
+
+  unsubscribePagosVivo = onSnapshot(q, (snapshot) => {
+    snapshot.docChanges().forEach(async (change) => {
+      if (change.type === "added" || change.type === "modified") {
+        const docSnap = change.doc;
+        const data = docSnap.data();
+        const montoPago = parseFloat(data.monto || data.monto_bs || 0);
+
+        if (montoPago > 0 && Math.abs(montoPago - totalBsRequerido) <= 1.50) {
+          if (unsubscribePagosVivo) { unsubscribePagosVivo(); unsubscribePagosVivo = null; }
+          await updateDoc(docSnap.ref, {
+            estado: "PROCESADO",
+            fecha_procesado: new Date().toISOString()
+          });
+          reproducirSonido('scan');
+          mostrarToast("¡Pago Móvil detectado automáticamente!", "exito");
+          cerrarModal('modal-carrito');
+          generarTicket('PAGADO');
+        }
+      }
+    });
+  }, () => {});
+}
+
+// Verificación Manual por 6 Dígitos de Referencia
 async function validarPagoFirestore() {
   const rawInput = document.getElementById('ref-pago-input').value.trim();
   const msgDiv = document.getElementById('msg-autopago');
   const btnValidar = document.getElementById('btn-validar-pago');
 
-  if (!rawInput) {
+  if (!rawInput || rawInput.length < 4) {
     msgDiv.className = "msg-error";
-    msgDiv.innerText = "❌ Por favor ingresa los últimos 6 dígitos de referencia.";
+    msgDiv.innerText = "Ingresa los últimos 6 dígitos de la referencia.";
     return;
   }
-  if (!window.carrito || window.carrito.length === 0) {
+  if (window.carrito.length === 0) {
     msgDiv.className = "msg-error";
-    msgDiv.innerText = "❌ El carrito está vacío.";
+    msgDiv.innerText = "El carrito está vacío.";
     return;
   }
 
@@ -702,7 +1024,7 @@ async function validarPagoFirestore() {
 
   btnValidar.disabled = true;
   msgDiv.className = "msg-cargando";
-  msgDiv.innerText = "⏳ Verificando referencia y monto en Firestore...";
+  msgDiv.innerText = "Consultando transacción en Firestore...";
 
   try {
     const pagosRef = collection(db, "verificacion_pagos");
@@ -712,17 +1034,16 @@ async function validarPagoFirestore() {
     if (!querySnapshot.empty) {
       for (const docSnap of querySnapshot.docs) {
         const data = docSnap.data();
-
         if (data.estado === "PROCESADO") {
           msgDiv.className = "msg-error";
-          msgDiv.innerText = "⚠️ Esta referencia ya fue utilizada anteriormente.";
+          msgDiv.innerText = "Esta referencia ya fue utilizada anteriormente.";
           break;
         }
 
-        let montoRegistradoEnPago = parseFloat(data.monto || data.monto_bs || 0);
-        if (montoRegistradoEnPago > 0 && Math.abs(montoRegistradoEnPago - totalBsRequerido) > 1.50) {
+        let montoRegistrado = parseFloat(data.monto || data.monto_bs || 0);
+        if (montoRegistrado > 0 && Math.abs(montoRegistrado - totalBsRequerido) > 1.50) {
           msgDiv.className = "msg-error";
-          msgDiv.innerText = `❌ Monto incorrecto. Pagado: Bs. ${montoRegistradoEnPago.toFixed(2)} | Total: Bs. ${totalBsRequerido.toFixed(2)}`;
+          msgDiv.innerText = `Monto diferente. Recibido: Bs. ${montoRegistrado.toFixed(2)} | Requerido: Bs. ${totalBsRequerido.toFixed(2)}`;
           break;
         }
 
@@ -732,85 +1053,83 @@ async function validarPagoFirestore() {
         });
 
         msgDiv.className = "msg-exito";
-        msgDiv.innerText = "✅ ¡Pago y Monto Confirmados Exitosamente!";
+        msgDiv.innerText = "¡Pago Confirmado Exitosamente!";
         reproducirSonido('scan');
 
         setTimeout(() => {
           cerrarModal('modal-carrito');
           generarTicket('PAGADO');
-          document.getElementById('ref-pago-input').value = "";
-          msgDiv.innerText = "";
-        }, 1000);
+        }, 900);
         break;
       }
     } else {
       msgDiv.className = "msg-error";
-      msgDiv.innerText = "❌ Referencia no encontrada. Verifica el número o espera unos segundos.";
+      msgDiv.innerText = "Referencia aún no recibida. Verifique los dígitos.";
     }
   } catch (error) {
     msgDiv.className = "msg-error";
-    msgDiv.innerText = "❌ Error de conexión al consultar la base de datos.";
+    msgDiv.innerText = "Error de red al verificar con el banco.";
   } finally {
     btnValidar.disabled = false;
   }
 }
 
+// ==========================================================
+// EMISIÓN DE TICKET CON QR DE AUDITORÍA ANTIRROBO
+// ==========================================================
 function generarTicket(estadoPago = 'PENDIENTE') {
-  if (window.carrito.length === 0) { mostrarToast("Agregue al menos un producto al carrito", "aviso"); return; }
+  if (window.carrito.length === 0) { mostrarToast("El carrito está vacío", "aviso"); return; }
+  if (unsubscribePagosVivo) { unsubscribePagosVivo(); unsubscribePagosVivo = null; }
   cerrarModal('modal-carrito');
 
   const numSerial = "TK-" + Math.floor(100000 + Math.random() * 900000);
   const fechaHora = new Date().toLocaleString('es-VE');
-  let totalUsd = 0; let totalBs = 0;
+  let baseUsd = 0; let baseBs = 0;
 
   window.carrito.forEach(cartItem => {
     let prod = productos.find(p => p.id === cartItem.id);
     if (prod) {
-      if (prod.stockGramos === undefined) prod.stockGramos = 10000;
-      prod.stockGramos = Math.max(0, prod.stockGramos - cartItem.peso);
+      let descuentoStock = cartItem.tipoVenta === 'unidad' ? cartItem.unidades : cartItem.peso;
+      prod.stockGramos = Math.max(0, (prod.stockGramos || 0) - descuentoStock);
     }
+    baseUsd += cartItem.subtotalUsd;
+    baseBs += cartItem.subtotalBs;
   });
   localStorage.setItem('bascula_productos', JSON.stringify(productos));
 
-  datosUltimoTicket = { serial: numSerial, fecha: fechaHora, tasa: tasaBCV, estado: estadoPago, items: [...window.carrito] };
+  const aplicaIGTF = metodoPagoActual === 'divisas' && estadoPago !== 'PAGADO';
+  const totalUsd = aplicaIGTF ? baseUsd * 1.03 : baseUsd;
+  const totalBs = aplicaIGTF ? baseBs * 1.03 : baseBs;
+
+  datosUltimoTicket = { serial: numSerial, fecha: fechaHora, tasa: tasaBCV, estado: estadoPago, items: [...window.carrito], totalUsd, totalBs };
+
   let esPagado = estadoPago === 'PAGADO';
-  let badgeEstadoText = esPagado ? "🟢 [ PAGADO EN KIOSCO ]" : "🟡 [ PENDIENTE DE PAGO - IR A CAJA ]";
+  let badgeEstadoText = esPagado ? "[ AUTOPAGO VERIFICADO - SALIDA AUTORIZADA ]" : "[ PENDIENTE DE PAGO - PASAR POR CAJA ]";
 
   let html = `
     <div style="text-align:center; margin-bottom:8px;">
-      <b>BÁSCULA INTELIGENTE POS</b><br>
+      <b>TERMINAL BÁSCULA POS PRO</b><br>
       <small>${fechaHora}</small><br>
       <b>SERIAL: ${numSerial}</b><br>
-      <div style="margin: 6px 0; padding: 4px; border-radius: 6px; font-weight: 900; background: ${esPagado ? '#dcfce7; color: #15803d;' : '#fef3c7; color: #b45309;'}">
+      <div style="margin: 6px 0; padding: 5px; border-radius: 6px; font-weight: 900; background: ${esPagado ? '#dcfce7; color: #15803d;' : '#fef3c7; color: #b45309;'}">
         ${badgeEstadoText}
       </div>
-      <small>Tasa Ref. BCV: ${tasaBCV.toFixed(2)} Bs/$</small>
+      <small>Tasa BCV: ${tasaBCV.toFixed(2)} Bs/$</small>
     </div>
     ----------------------------------<br>
   `;
 
   window.carrito.forEach(item => {
-    totalUsd += item.subtotalUsd; totalBs += item.subtotalBs;
+    const cantStr = item.tipoVenta === 'unidad' ? `${item.unidades} unid` : `${item.peso}g`;
     html += `
-      <b>${escaparHTML(item.nombre)}</b> (${item.peso}g)<br>
+      <b>${escaparHTML(item.nombre)}</b> (${cantStr})<br>
       $${item.subtotalUsd.toFixed(2)} | Bs. ${item.subtotalBs.toFixed(2)}<br>
     `;
   });
 
-  datosUltimoTicket.totalUsd = totalUsd;
-  datosUltimoTicket.totalBs = totalBs;
-
-  ventasHistorial.push({
-    serial: numSerial,
-    fecha: hoyStr,
-    hora: new Date().toLocaleTimeString('es-VE'),
-    totalUsd: totalUsd,
-    totalBs: totalBs,
-    estado: estadoPago,
-    cantProductos: window.carrito.length
-  });
-  localStorage.setItem('bascula_ventas_historial', JSON.stringify(ventasHistorial));
-  actualizarReporteAdmin();
+  if (aplicaIGTF) {
+    html += `<small>Recargo IGTF Divisas (3%): +$${(baseUsd * 0.03).toFixed(2)}</small><br>`;
+  }
 
   html += `
     ----------------------------------<br>
@@ -821,14 +1140,84 @@ function generarTicket(estadoPago = 'PENDIENTE') {
   `;
 
   document.getElementById('contenido-ticket').innerHTML = html;
+
+  // Dibujar QR de Auditoría en Salida
+  const qrAuditoriaPayload = `AUDIT|${numSerial}|${estadoPago}|USD:${totalUsd.toFixed(2)}|BS:${totalBs.toFixed(2)}|${fechaHora}`;
+  dibujarQRSuiche7B('qr-ticket-auditoria', qrAuditoriaPayload, false);
+
+  ventasHistorial.push({
+    serial: numSerial,
+    fecha: hoyStr,
+    hora: new Date().toLocaleTimeString('es-VE'),
+    totalUsd,
+    totalBs,
+    estado: estadoPago,
+    cantProductos: window.carrito.length
+  });
+  localStorage.setItem('bascula_ventas_historial', JSON.stringify(ventasHistorial));
+  actualizarReporteAdmin();
+
   window.carrito = [];
   actualizarCarritoBadge();
   abrirModal('modal-ticket');
 }
 
+// ==========================================================
+// CONEXIÓN HARDWARE DUAL: WEB BLUETOOTH BLE + WEB SERIAL USB
+// ==========================================================
+async function conectarBLE() {
+  if (!navigator.bluetooth) { mostrarToast("Web Bluetooth no disponible en este navegador", "error"); return; }
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: ['4fafc201-1fb5-459e-8fcc-c5c9c331914b', '0000181d-0000-1000-8000-00805f9b34fb']
+    });
+    await device.gatt.connect();
+    mostrarToast("Balanza Bluetooth BLE conectada", "exito");
+  } catch (e) {
+    mostrarToast("Modo Simulación BLE activo", "aviso");
+  }
+}
+
+async function conectarUSBSerial() {
+  if (!('serial' in navigator)) {
+    mostrarToast("Web Serial USB requiere Chrome/Edge en PC o Android OTG", "aviso");
+    return;
+  }
+  try {
+    const port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 9600 });
+    mostrarToast("Balanza USB Serial conectada (9600 baud)", "exito");
+
+    const textDecoder = new TextDecoderStream();
+    port.readable.pipeTo(textDecoder.writable);
+    const reader = textDecoder.readable.getReader();
+
+    let buffer = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      const lineas = buffer.split(/\r?\n/);
+      buffer = lineas.pop();
+      for (const linea of lineas) {
+        const match = linea.match(/(\d+(\.\d+)?)/);
+        if (match) {
+          let valLeido = parseFloat(match[1]);
+          // Si la balanza envía kilos con decimales (ej. 0.500), convertir a gramos
+          pesoBrutoGramos = linea.toLowerCase().includes('kg') ? Math.round(valLeido * 1000) : Math.round(valLeido);
+          actualizarDisplayPeso();
+        }
+      }
+    }
+  } catch (err) {
+    mostrarToast("Puerto Serial no iniciado: " + err.message, "aviso");
+  }
+}
+
 async function imprimirTicketBluetooth() {
-  if (!datosUltimoTicket) { mostrarToast("No hay ticket disponible", "aviso"); return; }
-  if (!navigator.bluetooth) { mostrarToast("Web Bluetooth no soportado en este navegador", "error"); return; }
+  if (!datosUltimoTicket) { mostrarToast("No hay ticket activo", "aviso"); return; }
+  if (!navigator.bluetooth) { mostrarToast("Web Bluetooth no soportado", "error"); return; }
 
   try {
     const device = await navigator.bluetooth.requestDevice({
@@ -841,22 +1230,24 @@ async function imprimirTicketBluetooth() {
     catch(e) { service = await server.getPrimaryService('0000e025-0000-1000-8000-00805f9b34fb'); }
 
     const characteristic = (await service.getCharacteristics())[0];
-    let texto = `================================\n        BASCULA POS        \n================================\nFECHA: ${datosUltimoTicket.fecha}\nSERIAL: ${datosUltimoTicket.serial}\nESTADO: [ ${datosUltimoTicket.estado} ]\n--------------------------------\n`;
+    let texto = `================================\n      BASCULA POS PRO      \n================================\nFECHA: ${datosUltimoTicket.fecha}\nSERIAL: ${datosUltimoTicket.serial}\nESTADO: [ ${datosUltimoTicket.estado} ]\n--------------------------------\n`;
     datosUltimoTicket.items.forEach(item => {
-      texto += `${item.nombre}\nPESO: ${item.peso}g  SUB: $${item.subtotalUsd.toFixed(2)}\nBS: ${item.subtotalBs.toFixed(2)} BS\n--------------------------------\n`;
+      const cant = item.tipoVenta === 'unidad' ? `${item.unidades}u` : `${item.peso}g`;
+      texto += `${item.nombre} (${cant})\nUSD: $${item.subtotalUsd.toFixed(2)} | Bs. ${item.subtotalBs.toFixed(2)}\n--------------------------------\n`;
     });
     texto += `TOTAL USD: $${datosUltimoTicket.totalUsd.toFixed(2)}\nTOTAL BS:  Bs. ${datosUltimoTicket.totalBs.toFixed(2)}\n================================\n\n\n`;
 
     await characteristic.writeValue((new TextEncoder()).encode(texto));
-    mostrarToast("¡Ticket enviado a la impresora!", "exito");
+    mostrarToast("Impresión enviada a la térmica", "exito");
   } catch (err) {
-    mostrarToast("Error Bluetooth: " + err.message, "error");
+    mostrarToast("No se encontró impresora térmica", "error");
   }
 }
 
 function repetirPesaje() { cerrarModal('modal-ticket'); }
 
 function reiniciarTodo() {
+  if (unsubscribePagosVivo) { unsubscribePagosVivo(); unsubscribePagosVivo = null; }
   window.carrito = []; taraGramos = 0; datosUltimoTicket = null;
   actualizarCarritoBadge();
   document.querySelectorAll('.modal').forEach(m => {
@@ -868,39 +1259,34 @@ function reiniciarTodo() {
   document.getElementById('pantalla-kiosco').style.display = 'none';
   const inicio = document.getElementById('pantalla-inicio');
   inicio.style.display = 'flex';
-  anime({
-    targets: inicio,
-    opacity: [0, 1],
-    duration: 450,
-    easing: 'easeOutQuad'
-  });
+  anime({ targets: inicio, opacity: [0, 1], duration: 400, easing: 'easeOutQuad' });
 }
 
-async function verificarPinAdmin() {
-  const pinInput = document.getElementById('input-pin-acceso').value;
-  const hashIngresado = await calcularHashSHA256(pinInput);
-
+// ==========================================================
+// PANEL ADMINISTRADOR Y GRÁFICA D3.JS
+// ==========================================================
+async function verificarPinAdmin(pinIngresado) {
+  const hashIngresado = await calcularHashSHA256(pinIngresado || "");
   if (hashIngresado === claveAdminHash) {
-    document.getElementById('input-pin-acceso').value = '';
-    cerrarModal('modal-pin');
     renderizarListaAdmin();
     actualizarReporteAdmin();
+    cargarDatosPagoMovilUI();
     abrirModal('modal-admin');
-    setTimeout(renderizarGraficoD3, 150);
+    setTimeout(renderizarGraficoD3, 160);
   } else {
-    mostrarToast("Clave incorrecta", "error");
+    mostrarToast("PIN de Administrador incorrecto", "error");
   }
 }
 
 async function cambiarClaveAdmin() {
-  let nueva = document.getElementById('adm-nueva-clave').value;
+  let nueva = document.getElementById('adm-nueva-clave').value.trim();
   if (nueva && nueva.length >= 4) {
     claveAdminHash = await calcularHashSHA256(nueva);
     localStorage.setItem('bascula_clave_hash', claveAdminHash);
     document.getElementById('adm-nueva-clave').value = '';
-    mostrarToast("Contraseña actualizada con cifrado SHA-256", "exito");
+    mostrarToast("PIN actualizado con cifrado SHA-256", "exito");
   } else {
-    mostrarToast("Mínimo 4 caracteres", "error");
+    mostrarToast("El PIN debe tener mínimo 4 dígitos", "error");
   }
 }
 
@@ -910,28 +1296,28 @@ function actualizarLogo() {
     logoUrl = url;
     localStorage.setItem('bascula_logo_url', logoUrl);
     aplicarLogo();
-    mostrarToast("Logo actualizado", "exito");
+    mostrarToast("Logo corporativo actualizado", "exito");
   }
 }
 
 function guardarProductoAdmin() {
   const nombre = document.getElementById('adm-nombre').value.trim();
   const categoria = document.getElementById('adm-categoria').value;
+  const tipoVenta = document.getElementById('adm-tipo-venta').value;
   const precio = parseFloat(document.getElementById('adm-precio').value);
-  const stockGramos = parseInt(document.getElementById('adm-stock').value) || 10000;
+  const stockGramos = parseInt(document.getElementById('adm-stock').value) || 0;
   const codigoBarras = document.getElementById('adm-codigo-barras').value.trim();
   const diasVida = parseInt(document.getElementById('adm-dias-vida').value) || 5;
   const fechaIngreso = document.getElementById('adm-fecha-ingreso').value || hoyStr;
   const imgUrlInput = document.getElementById('adm-img-url').value.trim();
 
   if (!nombre || isNaN(precio)) {
-    mostrarToast("Ingresa nombre y precio válido", "error");
+    mostrarToast("Nombre y precio son obligatorios", "error");
     return;
   }
 
   const imgFinal = imagenesBase64Temp.add || imgUrlInput || 'https://via.placeholder.com/200?text=Producto';
-
-  productos.push({ id: Date.now(), nombre, categoria, precioKg: precio, stockGramos, codigoBarras, diasVida, fechaIngreso, img: imgFinal });
+  productos.push({ id: Date.now(), nombre, categoria, tipoVenta, precioKg: precio, stockGramos, codigoBarras, diasVida, fechaIngreso, img: imgFinal });
   localStorage.setItem('bascula_productos', JSON.stringify(productos));
 
   document.getElementById('adm-nombre').value = '';
@@ -944,7 +1330,7 @@ function guardarProductoAdmin() {
   renderizarListaAdmin();
   renderizarGraficoD3();
   if (categoriaSeleccionada) filtrarPorCategoria(categoriaSeleccionada);
-  mostrarToast("Producto registrado exitosamente", "exito");
+  mostrarToast("Producto guardado en catálogo", "exito");
 }
 
 function renderizarListaAdmin() {
@@ -952,25 +1338,22 @@ function renderizarListaAdmin() {
   container.innerHTML = '';
   document.getElementById('contador-inventario').innerText = productos.length;
 
-  if (productos.length === 0) {
-    container.innerHTML = '<p style="font-size:0.85rem; color:var(--text-muted);">No hay productos en inventario.</p>';
-    return;
-  }
-
   productos.forEach(p => {
+    const esUnidad = p.tipoVenta === 'unidad';
+    const stockTxt = esUnidad ? `${p.stockGramos || 0} unid.` : `${((p.stockGramos || 0) / 1000).toFixed(1)}kg`;
     const item = document.createElement('div');
-    item.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:var(--card-bg); padding:8px 12px; border-radius:12px; border:1px solid rgba(0,0,0,0.1);";
+    item.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#070c14; padding:8px 12px; border-radius:10px; border:1px solid var(--border-glass);";
     item.innerHTML = `
-      <div style="display:flex; align-items:center; gap:8px;">
+      <div style="display:flex; align-items:center; gap:10px;">
         <img src="${escaparHTML(p.img)}" style="width:36px; height:36px; object-fit:cover; border-radius:8px;">
         <div>
-          <b style="font-size:0.9rem;">${escaparHTML(p.nombre)}</b>
-          <div style="font-size:0.78rem; color:var(--text-muted);">$${p.precioKg.toFixed(2)} /kg | ${escaparHTML(p.categoria)} | ${((p.stockGramos||0)/1000).toFixed(1)}kg</div>
+          <b style="font-size:0.88rem;">${escaparHTML(p.nombre)}</b>
+          <div style="font-size:0.75rem; color:var(--text-muted);">$${p.precioKg.toFixed(2)} (${esUnidad ? 'Unidad' : 'Kg'}) | ${escaparHTML(p.categoria)} | Stock: ${stockTxt}</div>
         </div>
       </div>
-      <div style="display:flex; gap:4px;">
-        <button class="btn-editar-prod" style="background:#f59e0b; color:white; border:none; padding:6px 10px; border-radius:8px; font-weight:800; font-size:0.75rem; cursor:pointer;">Editar</button>
-        <button class="btn-borrar-prod" style="background:#ef4444; color:white; border:none; padding:6px 10px; border-radius:8px; font-weight:800; font-size:0.75rem; cursor:pointer;">Borrar</button>
+      <div style="display:flex; gap:6px;">
+        <button class="btn-editar-prod" style="background:var(--amber); color:#000; border:none; padding:6px 10px; border-radius:8px; font-weight:800; font-size:0.75rem; cursor:pointer;">Editar</button>
+        <button class="btn-borrar-prod" style="background:var(--danger); color:#fff; border:none; padding:6px 10px; border-radius:8px; font-weight:800; font-size:0.75rem; cursor:pointer;">Borrar</button>
       </div>
     `;
     item.querySelector('.btn-editar-prod').addEventListener('click', () => abrirModalEditar(p.id));
@@ -988,6 +1371,7 @@ function abrirModalEditar(id) {
   document.getElementById('edit-prod-nombre').value = p.nombre;
   document.getElementById('edit-prod-precio').value = p.precioKg;
   document.getElementById('edit-prod-categoria').value = p.categoria || 'Frutería';
+  document.getElementById('edit-prod-tipo').value = p.tipoVenta || 'peso';
   document.getElementById('edit-prod-stock').value = p.stockGramos !== undefined ? p.stockGramos : 10000;
   document.getElementById('edit-prod-codigo').value = p.codigoBarras || '';
   document.getElementById('edit-prod-dias').value = p.diasVida || 5;
@@ -1000,30 +1384,28 @@ function abrirModalEditar(id) {
 
 function guardarCambiosEdicion() {
   const id = parseInt(document.getElementById('edit-prod-id').value);
-  let prodIndex = productos.findIndex(p => p.id === id);
-  if (prodIndex === -1) return;
+  let idx = productos.findIndex(p => p.id === id);
+  if (idx === -1) return;
 
-  productos[prodIndex].nombre = document.getElementById('edit-prod-nombre').value.trim();
-  productos[prodIndex].precioKg = parseFloat(document.getElementById('edit-prod-precio').value) || 0;
-  productos[prodIndex].categoria = document.getElementById('edit-prod-categoria').value;
-  productos[prodIndex].stockGramos = parseInt(document.getElementById('edit-prod-stock').value) || 0;
-  productos[prodIndex].codigoBarras = document.getElementById('edit-prod-codigo').value.trim();
-  productos[prodIndex].diasVida = parseInt(document.getElementById('edit-prod-dias').value) || 5;
-  productos[prodIndex].fechaIngreso = document.getElementById('edit-prod-fecha').value || hoyStr;
+  productos[idx].nombre = document.getElementById('edit-prod-nombre').value.trim();
+  productos[idx].precioKg = parseFloat(document.getElementById('edit-prod-precio').value) || 0;
+  productos[idx].categoria = document.getElementById('edit-prod-categoria').value;
+  productos[idx].tipoVenta = document.getElementById('edit-prod-tipo').value;
+  productos[idx].stockGramos = parseInt(document.getElementById('edit-prod-stock').value) || 0;
+  productos[idx].codigoBarras = document.getElementById('edit-prod-codigo').value.trim();
+  productos[idx].diasVida = parseInt(document.getElementById('edit-prod-dias').value) || 5;
+  productos[idx].fechaIngreso = document.getElementById('edit-prod-fecha').value || hoyStr;
   
   const imgUrlInput = document.getElementById('edit-prod-img-url').value.trim();
-  if (imagenesBase64Temp.edit) {
-    productos[prodIndex].img = imagenesBase64Temp.edit;
-  } else if (imgUrlInput) {
-    productos[prodIndex].img = imgUrlInput;
-  }
+  if (imagenesBase64Temp.edit) productos[idx].img = imagenesBase64Temp.edit;
+  else if (imgUrlInput) productos[idx].img = imgUrlInput;
 
   localStorage.setItem('bascula_productos', JSON.stringify(productos));
   cerrarModal('modal-editar-producto');
   renderizarListaAdmin();
   renderizarGraficoD3();
   if (categoriaSeleccionada) filtrarPorCategoria(categoriaSeleccionada);
-  mostrarToast("Producto actualizado", "exito");
+  mostrarToast("Cambios guardados", "exito");
 }
 
 function eliminarProductoAdmin(id) {
@@ -1032,7 +1414,7 @@ function eliminarProductoAdmin(id) {
   renderizarListaAdmin();
   renderizarGraficoD3();
   if (categoriaSeleccionada) filtrarPorCategoria(categoriaSeleccionada);
-  mostrarToast("Producto eliminado del catálogo", "aviso");
+  mostrarToast("Producto eliminado", "aviso");
 }
 
 function actualizarReporteAdmin() {
@@ -1053,13 +1435,14 @@ function renderizarGraficoD3() {
   const categoriasMap = {};
   productos.forEach(p => {
     let cat = p.categoria || 'Frutería';
-    categoriasMap[cat] = (categoriasMap[cat] || 0) + (p.stockGramos || 0) / 1000;
+    let valorKgEquiv = p.tipoVenta === 'unidad' ? (p.stockGramos || 0) : (p.stockGramos || 0) / 1000;
+    categoriasMap[cat] = (categoriasMap[cat] || 0) + valorKgEquiv;
   });
 
-  const dataset = Object.keys(categoriasMap).map(k => ({ categoria: k, stockKg: categoriasMap[k] }));
+  const dataset = Object.keys(categoriasMap).map(k => ({ categoria: k, stock: categoriasMap[k] }));
   if (dataset.length === 0) return;
 
-  const width = container.clientWidth || 420;
+  const width = container.clientWidth || 440;
   const height = 120;
 
   const svg = d3.select("#d3-chart-container")
@@ -1068,24 +1451,18 @@ function renderizarGraficoD3() {
     .attr("height", height)
     .attr("viewBox", `0 0 ${width} ${height}`);
 
-  const x = d3.scaleBand()
-    .range([25, width - 15])
-    .domain(dataset.map(d => d.categoria))
-    .padding(0.35);
-
-  const y = d3.scaleLinear()
-    .range([height - 22, 18])
-    .domain([0, d3.max(dataset, d => d.stockKg) || 10]);
+  const x = d3.scaleBand().range([25, width - 15]).domain(dataset.map(d => d.categoria)).padding(0.35);
+  const y = d3.scaleLinear().range([height - 22, 18]).domain([0, d3.max(dataset, d => d.stock) || 10]);
 
   svg.selectAll(".barra")
     .data(dataset)
     .enter()
     .append("rect")
     .attr("x", d => x(d.categoria))
-    .attr("y", d => y(d.stockKg))
+    .attr("y", d => y(d.stock))
     .attr("width", x.bandwidth())
-    .attr("height", d => Math.max(0, height - 22 - y(d.stockKg)))
-    .attr("fill", "#2d6a4f")
+    .attr("height", d => Math.max(0, height - 22 - y(d.stock)))
+    .attr("fill", "#10b981")
     .attr("rx", 5);
 
   svg.selectAll(".label-cat")
@@ -1097,7 +1474,7 @@ function renderizarGraficoD3() {
     .attr("text-anchor", "middle")
     .style("font-size", "10px")
     .style("font-weight", "700")
-    .style("fill", "currentColor")
+    .style("fill", "#94a3b8")
     .text(d => d.categoria);
 
   svg.selectAll(".texto-barra")
@@ -1105,48 +1482,37 @@ function renderizarGraficoD3() {
     .enter()
     .append("text")
     .attr("x", d => x(d.categoria) + x.bandwidth() / 2)
-    .attr("y", d => y(d.stockKg) - 4)
+    .attr("y", d => y(d.stock) - 4)
     .attr("text-anchor", "middle")
     .style("font-size", "9px")
     .style("font-weight", "800")
-    .style("fill", "#52b788")
-    .text(d => d.stockKg.toFixed(1) + "kg");
+    .style("fill", "#10b981")
+    .text(d => d.stock.toFixed(1));
 }
 
 function exportarVentasCSV() {
-  if (ventasHistorial.length === 0) { mostrarToast("No hay ventas registradas para exportar", "aviso"); return; }
-  let csvContent = "data:text/csv;charset=utf-8,Serial,Fecha,Hora,CantProductos,TotalUSD,TotalBS,Estado\n";
+  if (ventasHistorial.length === 0) { mostrarToast("Sin ventas para exportar", "aviso"); return; }
+  let csv = "data:text/csv;charset=utf-8,Serial,Fecha,Hora,Articulos,TotalUSD,TotalBS,Estado\n";
   ventasHistorial.forEach(v => {
-    csvContent += `${v.serial},${v.fecha},${v.hora},${v.cantProductos},${v.totalUsd.toFixed(2)},${v.totalBs.toFixed(2)},${v.estado}\n`;
+    csv += `${v.serial},${v.fecha},${v.hora},${v.cantProductos},${v.totalUsd.toFixed(2)},${v.totalBs.toFixed(2)},${v.estado}\n`;
   });
-  descargarCSV(csvContent, `Ventas_${hoyStr}.csv`);
+  descargarCSV(csv, `Ventas_POS_${hoyStr}.csv`);
 }
 
 function exportarProductosCSV() {
-  let csvContent = "data:text/csv;charset=utf-8,ID,Nombre,Categoria,PrecioUSD,StockGramos,CodigoBarras\n";
+  let csv = "data:text/csv;charset=utf-8,ID,Nombre,Categoria,ModoVenta,PrecioUSD,Stock,CodigoBarras\n";
   productos.forEach(p => {
-    csvContent += `${p.id},"${p.nombre}",${p.categoria},${p.precioKg},${p.stockGramos || 0},${p.codigoBarras || ''}\n`;
+    csv += `${p.id},"${p.nombre}",${p.categoria},${p.tipoVenta || 'peso'},${p.precioKg},${p.stockGramos || 0},${p.codigoBarras || ''}\n`;
   });
-  descargarCSV(csvContent, `Inventario_Productos.csv`);
+  descargarCSV(csv, `Inventario_POS.csv`);
 }
 
 function descargarCSV(content, filename) {
-  const encodedUri = encodeURI(content);
   const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
+  link.setAttribute("href", encodeURI(content));
   link.setAttribute("download", filename);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
   mostrarToast(`Archivo ${filename} descargado`, "exito");
-}
-
-async function conectarBLE() {
-  try {
-    const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['4fafc201-1fb5-459e-8fcc-c5c9c331914b'] });
-    await device.gatt.connect();
-    mostrarToast("Conectado a la Báscula BLE", "exito");
-  } catch (e) {
-    mostrarToast("Modo Simulación BLE activo", "aviso");
-  }
 }
