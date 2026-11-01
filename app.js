@@ -19,23 +19,26 @@ const db = getFirestore(app);
 
 // Estado Global y Persistencia Segura
 let tasaBCV = parseFloat(localStorage.getItem('bascula_tasa_bcv')) || 36.50;
-// Hash SHA-256 de "1234"
+// Hash SHA-256 por defecto de "1234"
 let claveAdminHash = localStorage.getItem('bascula_clave_hash') || "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4";
 let logoUrl = localStorage.getItem('bascula_logo_url') || "https://cdn-icons-png.flaticon.com/512/1046/1046857.png";
 
-// Datos Bancarios para el Motor QR Suiche 7B
+// Datos Bancarios para el Motor QR Suiche 7B (Con tus datos predeterminados listos)
 let datosPagoMovil = JSON.parse(localStorage.getItem('bascula_datos_pm')) || {
   banco: "0102 - Banco de Venezuela",
-  rif: "V12345678",
-  telefono: "04121234567"
+  rif: "V30629336",
+  telefono: "04123167126"
 };
+
+// Imagen QR propia subida directamente desde el banco (opcional)
+let qrBancoCustomBase64 = localStorage.getItem('bascula_qr_custom_img') || null;
 
 let pesoBrutoGramos = 0;
 let taraGramos = 0;
 window.carrito = [];
 let productoTemp = null;
 let cantidadUnidadesTemp = 1;
-let metodoPagoActual = 'pagomovil'; // 'pagomovil' | 'divisas'
+let metodoPagoActual = 'pagomovil';
 let unsubscribePagosVivo = null;
 let numpadCallback = null;
 let numpadMaxLen = 6;
@@ -49,18 +52,26 @@ let ventasHistorial = JSON.parse(localStorage.getItem('bascula_ventas_historial'
 let imagenesBase64Temp = { add: null, edit: null };
 const hoyStr = new Date().toISOString().split('T')[0];
 
-// Catálogo Predeterminado (Híbrido: Peso y Unidad)
+// Catálogo Predeterminado (Incluye la nueva categoría "Varios / Empaques" por Unidad)
 const productosPredeterminados = [
   { id: 1, nombre: 'Manzana Red', categoria: 'Frutería', tipoVenta: 'peso', precioKg: 2.50, stockGramos: 15000, codigoBarras: '7591001', diasVida: 7, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300' },
   { id: 2, nombre: 'Cambur / Banana', categoria: 'Frutería', tipoVenta: 'peso', precioKg: 1.20, stockGramos: 8000, codigoBarras: '7591002', diasVida: 3, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300' },
   { id: 3, nombre: 'Zanahoria Fresca', categoria: 'Verdulería', tipoVenta: 'peso', precioKg: 1.80, stockGramos: 20000, codigoBarras: '7591003', diasVida: 8, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1598170845058-12ef4a457939?w=300' },
   { id: 4, nombre: 'Tomate Perita', categoria: 'Verdulería', tipoVenta: 'peso', precioKg: 3.00, stockGramos: 12000, codigoBarras: '7591004', diasVida: 4, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=300' },
-  { id: 5, nombre: 'Maní Salado Empaque 250g', categoria: 'Manicería', tipoVenta: 'unidad', precioKg: 1.50, stockGramos: 40, codigoBarras: '7591005', diasVida: 45, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1567892568620-80d8591325d7?w=300' },
+  { id: 5, nombre: 'Maní Salado 250g', categoria: 'Manicería', tipoVenta: 'unidad', precioKg: 1.50, stockGramos: 40, codigoBarras: '7591005', diasVida: 45, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1567892568620-80d8591325d7?w=300' },
   { id: 6, nombre: 'Caraotas Negras', categoria: 'Granos', tipoVenta: 'peso', precioKg: 2.20, stockGramos: 30000, codigoBarras: '7591006', diasVida: 60, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1551462147-ff29053bfc14?w=300' },
-  { id: 7, nombre: 'Queso Paisa Pasteurizado', categoria: 'Charcutería', tipoVenta: 'peso', precioKg: 6.50, stockGramos: 6000, codigoBarras: '7591007', diasVida: 10, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=300' }
+  { id: 7, nombre: 'Queso Paisa', categoria: 'Charcutería', tipoVenta: 'peso', precioKg: 6.50, stockGramos: 6000, codigoBarras: '7591007', diasVida: 10, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=300' },
+  { id: 8, nombre: 'Paquete de Casabe Gourmet', categoria: 'Varios / Empaques', tipoVenta: 'unidad', precioKg: 2.00, stockGramos: 30, codigoBarras: '7591008', diasVida: 90, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300' },
+  { id: 9, nombre: 'medio Cartón de Huevos (15u)', categoria: 'Varios / Empaques', tipoVenta: 'unidad', precioKg: 2.80, stockGramos: 25, codigoBarras: '7591009', diasVida: 15, fechaIngreso: hoyStr, img: 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=300' }
 ];
 
 let productos = JSON.parse(localStorage.getItem('bascula_productos')) || productosPredeterminados;
+
+// Asegurar que si ya tenías productos guardados en caché se agreguen los de ejemplo de la nueva categoría si no existe ninguno
+if (!productos.some(p => p.categoria === 'Varios / Empaques')) {
+  productos.push(productosPredeterminados[7], productosPredeterminados[8]);
+  localStorage.setItem('bascula_productos', JSON.stringify(productos));
+}
 
 // Sintetizador de Sonido Web Audio API
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -132,30 +143,63 @@ function mostrarToast(mensaje, tipo = 'exito') {
 }
 
 // ==========================================================
-// MOTOR GENERADOR DE CÓDIGO QR BANCARIO SUICHE 7B (NIVEL H)
+// GENERADOR DE TOKEN OFICIAL JWT SUICHE 7B + MOTOR QR CALIBRADO
 // ==========================================================
+function generarPayloadOficialSuiche7B(bancoStr, rifStr, telStr, montoBsNumber) {
+  const bankCode = String(bancoStr || "0102").replace(/\D/g, '').slice(0, 4) || "0102";
+  const cleanId = String(rifStr || "V30629336").toUpperCase().replace(/[^A-Z0-9]/g, '');
+  
+  let digitsPhone = String(telStr || "04123167126").replace(/\D/g, '');
+  if (digitsPhone.startsWith('0')) {
+    digitsPhone = '58' + digitsPhone.slice(1);
+  } else if (!digitsPhone.startsWith('58')) {
+    digitsPhone = '58' + digitsPhone;
+  }
+
+  // Estructura exacta decodificada del QR bancario real de Suiche 7B
+  const headerB64 = "eyJhbGciOiAibm9uZSIsICJ0eXAiOiAiSldUIn0=";
+  const ahoraSeg = Math.floor(Date.now() / 1000);
+  
+  const payloadObj = {
+    iss: "SUICHE7B",
+    iat: ahoraSeg,
+    exp: -1,
+    data: {
+      bank: bankCode,
+      identification: cleanId,
+      phone: digitsPhone,
+      amount: Number(montoBsNumber).toFixed(2),
+      url: "https://qr.suiche7b.com.ve"
+    }
+  };
+
+  const jsonPayload = JSON.stringify(payloadObj);
+  const payloadB64 = btoa(unescape(encodeURIComponent(jsonPayload)));
+  return `${headerB64}.${payloadB64}.`;
+}
+
 function dibujarQRSuiche7B(canvasId, payloadTexto, incluirLogoSuiche = true) {
   const canvas = document.getElementById(canvasId);
   if (!canvas || typeof qrcode === 'undefined') return;
   const ctx = canvas.getContext('2d');
   const size = canvas.width;
 
-  // Nivel H (30% de corrección de errores) para soportar el emblema Suiche 7B en el centro
-  const qr = qrcode(0, 'H');
+  // Nivel M/Q optimizado + Quiet Zone amplia (10%) para lectura instantánea en Mercantil Tpago y BDV
+  const qr = qrcode(0, incluirLogoSuiche ? 'Q' : 'M');
   qr.addData(payloadTexto);
   qr.make();
 
   const moduleCount = qr.getModuleCount();
-  const margin = Math.floor(size * 0.06);
+  const margin = Math.floor(size * 0.10);
   const availableSize = size - margin * 2;
   const tileW = availableSize / moduleCount;
   const tileH = availableSize / moduleCount;
 
-  // Fondo blanco limpio
+  // Fondo blanco puro (indispensable para que las apps bancarias detecten los bordes)
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, size, size);
 
-  // Dibujar módulos del QR
+  // Dibujar módulos con coordenadas enteras nítidas
   ctx.fillStyle = '#000000';
   for (let row = 0; row < moduleCount; row++) {
     for (let col = 0; col < moduleCount; col++) {
@@ -169,33 +213,29 @@ function dibujarQRSuiche7B(canvasId, payloadTexto, incluirLogoSuiche = true) {
     }
   }
 
-  // Estampar emblema central estilo Suiche 7B (como en la imagen de referencia)
+  // Emblema central Suiche 7B calibrado al 16% (no obstruye patrones de alineación)
   if (incluirLogoSuiche) {
-    const boxSize = Math.floor(size * 0.24);
+    const boxSize = Math.floor(size * 0.165);
     const boxX = Math.floor((size - boxSize) / 2);
     const boxY = Math.floor((size - boxSize) / 2);
 
-    // Recuadro blanco protector central
     ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.roundRect(boxX - 3, boxY - 3, boxSize + 6, boxSize + 6, 8);
-    ctx.fill();
+    ctx.fillRect(boxX - 3, boxY - 3, boxSize + 6, boxSize + 6);
 
-    // Cabecera "SUICHE"
     ctx.fillStyle = '#111827';
-    ctx.font = `900 ${Math.floor(boxSize * 0.19)}px system-ui, sans-serif`;
+    ctx.font = `900 ${Math.floor(boxSize * 0.20)}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText('SUICHE', size / 2, boxY + boxSize * 0.22);
 
-    // Emblema redondeado multicolor 7B (4 franjas: Morado, Azul, Verde, Ámbar)
     const badgeY = boxY + boxSize * 0.28;
     const badgeH = boxSize * 0.68;
-    const badgeW = boxSize * 0.88;
+    const badgeW = boxSize * 0.90;
     const badgeX = (size - badgeW) / 2;
 
     ctx.save();
     ctx.beginPath();
-    ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 7);
+    if (ctx.roundRect) ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 5);
+    else ctx.rect(badgeX, badgeY, badgeW, badgeH);
     ctx.clip();
 
     const coloresSuiche = ['#9333ea', '#0284c7', '#16a34a', '#ea580c'];
@@ -205,14 +245,56 @@ function dibujarQRSuiche7B(canvasId, payloadTexto, incluirLogoSuiche = true) {
       ctx.fillRect(badgeX + idx * stripeW, badgeY, stripeW + 1, badgeH);
     });
 
-    // Texto "7B" en blanco de alto contraste en el centro del emblema
     ctx.fillStyle = '#ffffff';
-    ctx.font = `900 ${Math.floor(badgeH * 0.68)}px system-ui, sans-serif`;
+    ctx.font = `900 ${Math.floor(badgeH * 0.66)}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('7B', size / 2, badgeY + badgeH / 2 + 1);
     ctx.restore();
   }
+}
+
+// Descargar únicamente el cuadro blanco del QR (para adjuntar en Tpago/BDV sin errores)
+function descargarQRLimpio() {
+  const link = document.createElement('a');
+  link.download = `QR_PagoMovil_${datosPagoMovil.rif}.png`;
+
+  if (qrBancoCustomBase64) {
+    link.href = qrBancoCustomBase64;
+  } else {
+    const canvas = document.getElementById('qr-suiche-canvas');
+    link.href = canvas.toDataURL('image/png', 1.0);
+  }
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  mostrarToast("Imagen QR limpia guardada lista para tu banco", "exito");
+}
+
+// Subir imagen QR original descargada del banco en el Panel Admin
+function procesarSubidaQRBanco(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const MAX_QR = 500;
+      canvas.width = MAX_QR;
+      canvas.height = MAX_QR;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, MAX_QR, MAX_QR);
+      ctx.drawImage(img, 0, 0, MAX_QR, MAX_QR);
+      
+      qrBancoCustomBase64 = canvas.toDataURL('image/png', 0.92);
+      localStorage.setItem('bascula_qr_custom_img', qrBancoCustomBase64);
+      recalcularTotalesCarritoUI();
+      mostrarToast("Imagen QR oficial de tu banco activada", "exito");
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 // ==========================================================
@@ -250,7 +332,7 @@ function procesarTeclaNumpad(key) {
   actualizarVisorNumpad();
 }
 
-// Compresor de imágenes de Galería en Canvas
+// Compresor de imágenes de Galería para Productos
 function comprimirImagenGaleria(file, modo) {
   if (!file) return;
   const reader = new FileReader();
@@ -324,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-volver').addEventListener('click', mostrarCategorias);
   document.getElementById('btn-cart-float').addEventListener('click', abrirCarrito);
 
-  // Acceso Admin usando el Numpad Táctil Integrado
+  // Acceso Admin con Numpad Táctil
   document.getElementById('btn-acceso-admin').addEventListener('click', () => {
     abrirNumpad({
       titulo: "PIN de Administrador",
@@ -334,30 +416,54 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Conexiones Hardware (BLE + USB Serial)
+  // Hardware (BLE + USB Serial)
   document.getElementById('btn-conectar-ble').addEventListener('click', conectarBLE);
   document.getElementById('btn-conectar-usb').addEventListener('click', conectarUSBSerial);
 
-  // Tasas y Configuración Admin
+  // Configuración Admin y QR Bancario
   document.getElementById('btn-actualizar-tasa-header').addEventListener('click', obtenerTasaBCVOnline);
   document.getElementById('btn-sincronizar').addEventListener('click', obtenerTasaBCVOnline);
   document.getElementById('btn-guardar-tasa').addEventListener('click', guardarTasaManual);
   document.getElementById('btn-guardar-pm').addEventListener('click', guardarDatosPagoMovil);
+  document.getElementById('btn-subir-qr-banco').addEventListener('click', () => document.getElementById('input-file-qr-banco').click());
+  document.getElementById('input-file-qr-banco').addEventListener('change', (e) => procesarSubidaQRBanco(e.target.files[0]));
+  document.getElementById('btn-usar-qr-motor').addEventListener('click', () => {
+    qrBancoCustomBase64 = null;
+    localStorage.removeItem('bascula_qr_custom_img');
+    recalcularTotalesCarritoUI();
+    mostrarToast("Motor QR Suiche 7B automático activado", "exito");
+  });
+
+  // Cambio automático a "Por Unidad" cuando seleccionas la categoría "Varios / Empaques"
+  document.getElementById('adm-categoria').addEventListener('change', (e) => {
+    if (e.target.value === 'Varios / Empaques') {
+      document.getElementById('adm-tipo-venta').value = 'unidad';
+      document.getElementById('adm-stock').value = '50';
+    }
+  });
+  document.getElementById('edit-prod-categoria').addEventListener('change', (e) => {
+    if (e.target.value === 'Varios / Empaques') {
+      document.getElementById('edit-prod-tipo').value = 'unidad';
+    }
+  });
+
   document.getElementById('btn-actualizar-logo').addEventListener('click', actualizarLogo);
   document.getElementById('btn-guardar-prod').addEventListener('click', guardarProductoAdmin);
   document.getElementById('btn-guardar-edit').addEventListener('click', guardarCambiosEdicion);
   document.getElementById('btn-cambiar-clave').addEventListener('click', cambiarClaveAdmin);
   document.getElementById('btn-confirmar-peso-sim').addEventListener('click', aplicarPesoSimulado);
 
-  // Modal Confirmación Híbrida (Peso / Unidades)
+  // Modal Confirmación Híbrida
   document.getElementById('btn-restar-unidad').addEventListener('click', () => ajustarUnidadesModal(-1));
   document.getElementById('btn-sumar-unidad').addEventListener('click', () => ajustarUnidadesModal(1));
   document.getElementById('btn-confirmar-agregar').addEventListener('click', confirmarAgregar);
 
-  // Carrito, Tabs de Pago y Numpad de Referencia
+  // Carrito, Descarga de QR Limpio y Numpad de Referencia
   document.getElementById('tab-pagomovil').addEventListener('click', () => cambiarMetodoPago('pagomovil'));
   document.getElementById('tab-divisas').addEventListener('click', () => cambiarMetodoPago('divisas'));
-  
+  document.getElementById('btn-descargar-qr-limpio').addEventListener('click', descargarQRLimpio);
+  document.getElementById('btn-zoom-qr').addEventListener('click', descargarQRLimpio);
+
   const abrirNumpadRef = () => {
     abrirNumpad({
       titulo: "Últimos 6 Dígitos de Referencia",
@@ -381,13 +487,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-exportar-ventas').addEventListener('click', exportarVentasCSV);
   document.getElementById('btn-exportar-catalogo').addEventListener('click', exportarProductosCSV);
 
-  // Galería Admin
+  // Galería Productos
   document.getElementById('btn-galeria-add').addEventListener('click', () => document.getElementById('img-gallery-add').click());
   document.getElementById('img-gallery-add').addEventListener('change', (e) => comprimirImagenGaleria(e.target.files[0], 'add'));
   document.getElementById('btn-galeria-edit').addEventListener('click', () => document.getElementById('img-gallery-edit').click());
   document.getElementById('img-gallery-edit').addEventListener('change', (e) => comprimirImagenGaleria(e.target.files[0], 'edit'));
 
-  // Teclas del Numpad Táctil
+  // Teclas Numpad
   document.querySelectorAll('.numpad-key').forEach(btn => {
     btn.addEventListener('click', () => procesarTeclaNumpad(btn.dataset.key));
   });
@@ -396,7 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof numpadCallback === 'function') numpadCallback(numpadValorActual);
   });
 
-  // Categorías
+  // Categorías (incluyendo Varios / Empaques)
   document.querySelectorAll('.card-categoria').forEach(card => {
     card.addEventListener('click', () => filtrarPorCategoria(card.dataset.categoria));
   });
@@ -404,14 +510,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // Buscador con Lodash Debounce
   document.getElementById('input-buscar').addEventListener('input', _.debounce(buscarProductosDirecto, 200));
 
-  // Chips de peso rápido
+  // Chips de peso
   document.querySelectorAll('.chip-peso').forEach(chip => {
     chip.addEventListener('click', () => {
       document.getElementById('input-peso-sim').value = chip.dataset.gramos;
     });
   });
 
-  // Botones de cerrar modales
+  // Cierre de modales
   document.querySelectorAll('[data-close]').forEach(btn => {
     btn.addEventListener('click', () => {
       const targetId = btn.getAttribute('data-close');
@@ -423,7 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Atajos de teclado físico (F4 y Escape)
+  // Atajos de teclado
   window.addEventListener('keydown', (e) => {
     if (e.key === 'F4') {
       e.preventDefault();
@@ -509,7 +615,8 @@ function guardarDatosPagoMovil() {
   datosPagoMovil = { banco, rif, telefono };
   localStorage.setItem('bascula_datos_pm', JSON.stringify(datosPagoMovil));
   cargarDatosPagoMovilUI();
-  mostrarToast("Datos de Pago Móvil QR guardados", "exito");
+  recalcularTotalesCarritoUI();
+  mostrarToast("Datos de Pago Móvil QR actualizados", "exito");
 }
 
 // ==========================================================
@@ -704,12 +811,12 @@ function renderizarProductosGrid(lista) {
   const grid = document.getElementById('vista-productos');
   grid.innerHTML = '';
   if (lista.length === 0) {
-    grid.innerHTML = '<p style="grid-column: 1/-1; text-align:center; padding:30px; color:var(--text-muted); font-weight:700;">No se encontraron productos.</p>';
+    grid.innerHTML = '<p style="grid-column: 1/-1; text-align:center; padding:30px; color:var(--text-muted); font-weight:700;">No se encontraron productos en esta categoría.</p>';
     return;
   }
 
   lista.forEach(p => {
-    const esPorUnidad = p.tipoVenta === 'unidad';
+    const esPorUnidad = p.tipoVenta === 'unidad' || p.categoria === 'Varios / Empaques';
     const sufijoUnidad = esPorUnidad ? '/unid' : '/kg';
     const estadoOferta = calcularEstadoOferta(p);
     let precioEfectivo = estadoOferta.precioFinal;
@@ -757,7 +864,7 @@ function seleccionarProducto(id) {
   productoTemp = productos.find(p => p.id === id);
   if (!productoTemp) return;
 
-  const esPorUnidad = productoTemp.tipoVenta === 'unidad';
+  const esPorUnidad = productoTemp.tipoVenta === 'unidad' || productoTemp.categoria === 'Varios / Empaques';
   let stockDisponible = productoTemp.stockGramos !== undefined ? productoTemp.stockGramos : 10000;
   if (stockDisponible <= 0) {
     mostrarToast(`"${productoTemp.nombre}" está agotado en inventario`, "error");
@@ -802,7 +909,7 @@ function ajustarUnidadesModal(delta) {
 
 function recalcularSubtotalModal() {
   if (!productoTemp) return;
-  const esPorUnidad = productoTemp.tipoVenta === 'unidad';
+  const esPorUnidad = productoTemp.tipoVenta === 'unidad' || productoTemp.categoria === 'Varios / Empaques';
   const estadoOferta = calcularEstadoOferta(productoTemp);
   
   let subtotalUsd = esPorUnidad 
@@ -847,7 +954,7 @@ function animarVueloAlCarrito(imgSrc) {
 
 function confirmarAgregar() {
   if (!productoTemp) return;
-  const esPorUnidad = productoTemp.tipoVenta === 'unidad';
+  const esPorUnidad = productoTemp.tipoVenta === 'unidad' || productoTemp.categoria === 'Varios / Empaques';
   let pesoNeto = obtenerPesoNeto();
   if (!esPorUnidad && pesoNeto <= 0) return;
 
@@ -901,23 +1008,30 @@ function recalcularTotalesCarritoUI() {
   let baseUsd = window.carrito.reduce((acc, item) => acc + item.subtotalUsd, 0);
   let baseBs = window.carrito.reduce((acc, item) => acc + item.subtotalBs, 0);
 
-  // Si paga en divisas efectivo, suma 3% de IGTF
   let finalUsd = metodoPagoActual === 'divisas' ? baseUsd * 1.03 : baseUsd;
   let finalBs = metodoPagoActual === 'divisas' ? baseBs * 1.03 : baseBs;
 
   document.getElementById('cart-total-usd').innerText = finalUsd.toFixed(2);
   document.getElementById('cart-total-bs').innerText = finalBs.toFixed(2);
 
-  // Generar el Código QR Bancario Suiche 7B con el monto exacto en Bs
-  const codigoBanco = datosPagoMovil.banco.slice(0, 4);
-  const payloadSuiche7B = JSON.stringify({
-    red: "SUICHE7B",
-    banco: codigoBanco,
-    id: datosPagoMovil.rif,
-    telefono: datosPagoMovil.telefono.replace(/\D/g, ''),
-    monto: finalBs.toFixed(2)
-  });
-  dibujarQRSuiche7B('qr-suiche-canvas', payloadSuiche7B, true);
+  const canvasQR = document.getElementById('qr-suiche-canvas');
+  const imgCustomQR = document.getElementById('qr-custom-img');
+
+  if (qrBancoCustomBase64) {
+    canvasQR.style.display = 'none';
+    imgCustomQR.src = qrBancoCustomBase64;
+    imgCustomQR.style.display = 'block';
+  } else {
+    imgCustomQR.style.display = 'none';
+    canvasQR.style.display = 'block';
+    const jwtSuiche = generarPayloadOficialSuiche7B(
+      datosPagoMovil.banco,
+      datosPagoMovil.rif,
+      datosPagoMovil.telefono,
+      finalBs
+    );
+    dibujarQRSuiche7B('qr-suiche-canvas', jwtSuiche, true);
+  }
 }
 
 function abrirCarrito() {
@@ -948,7 +1062,6 @@ function abrirCarrito() {
     });
   }
 
-  // Auditoría Antirrobo de peso en bolsa
   document.getElementById('peso-esperado-cart').innerText = `${pesoEsperadoTotal}g`;
   document.getElementById('peso-actual-cart').innerText = `${obtenerPesoNeto()}g`;
 
@@ -1141,7 +1254,6 @@ function generarTicket(estadoPago = 'PENDIENTE') {
 
   document.getElementById('contenido-ticket').innerHTML = html;
 
-  // Dibujar QR de Auditoría en Salida
   const qrAuditoriaPayload = `AUDIT|${numSerial}|${estadoPago}|USD:${totalUsd.toFixed(2)}|BS:${totalBs.toFixed(2)}|${fechaHora}`;
   dibujarQRSuiche7B('qr-ticket-auditoria', qrAuditoriaPayload, false);
 
@@ -1204,7 +1316,6 @@ async function conectarUSBSerial() {
         const match = linea.match(/(\d+(\.\d+)?)/);
         if (match) {
           let valLeido = parseFloat(match[1]);
-          // Si la balanza envía kilos con decimales (ej. 0.500), convertir a gramos
           pesoBrutoGramos = linea.toLowerCase().includes('kg') ? Math.round(valLeido * 1000) : Math.round(valLeido);
           actualizarDisplayPeso();
         }
@@ -1303,7 +1414,7 @@ function actualizarLogo() {
 function guardarProductoAdmin() {
   const nombre = document.getElementById('adm-nombre').value.trim();
   const categoria = document.getElementById('adm-categoria').value;
-  const tipoVenta = document.getElementById('adm-tipo-venta').value;
+  const tipoVenta = categoria === 'Varios / Empaques' ? 'unidad' : document.getElementById('adm-tipo-venta').value;
   const precio = parseFloat(document.getElementById('adm-precio').value);
   const stockGramos = parseInt(document.getElementById('adm-stock').value) || 0;
   const codigoBarras = document.getElementById('adm-codigo-barras').value.trim();
@@ -1339,7 +1450,7 @@ function renderizarListaAdmin() {
   document.getElementById('contador-inventario').innerText = productos.length;
 
   productos.forEach(p => {
-    const esUnidad = p.tipoVenta === 'unidad';
+    const esUnidad = p.tipoVenta === 'unidad' || p.categoria === 'Varios / Empaques';
     const stockTxt = esUnidad ? `${p.stockGramos || 0} unid.` : `${((p.stockGramos || 0) / 1000).toFixed(1)}kg`;
     const item = document.createElement('div');
     item.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#070c14; padding:8px 12px; border-radius:10px; border:1px solid var(--border-glass);";
@@ -1371,7 +1482,7 @@ function abrirModalEditar(id) {
   document.getElementById('edit-prod-nombre').value = p.nombre;
   document.getElementById('edit-prod-precio').value = p.precioKg;
   document.getElementById('edit-prod-categoria').value = p.categoria || 'Frutería';
-  document.getElementById('edit-prod-tipo').value = p.tipoVenta || 'peso';
+  document.getElementById('edit-prod-tipo').value = p.tipoVenta || (p.categoria === 'Varios / Empaques' ? 'unidad' : 'peso');
   document.getElementById('edit-prod-stock').value = p.stockGramos !== undefined ? p.stockGramos : 10000;
   document.getElementById('edit-prod-codigo').value = p.codigoBarras || '';
   document.getElementById('edit-prod-dias').value = p.diasVida || 5;
@@ -1435,8 +1546,8 @@ function renderizarGraficoD3() {
   const categoriasMap = {};
   productos.forEach(p => {
     let cat = p.categoria || 'Frutería';
-    let valorKgEquiv = p.tipoVenta === 'unidad' ? (p.stockGramos || 0) : (p.stockGramos || 0) / 1000;
-    categoriasMap[cat] = (categoriasMap[cat] || 0) + valorKgEquiv;
+    let valorEquiv = (p.tipoVenta === 'unidad' || p.categoria === 'Varios / Empaques') ? (p.stockGramos || 0) : (p.stockGramos || 0) / 1000;
+    categoriasMap[cat] = (categoriasMap[cat] || 0) + valorEquiv;
   });
 
   const dataset = Object.keys(categoriasMap).map(k => ({ categoria: k, stock: categoriasMap[k] }));
@@ -1451,7 +1562,7 @@ function renderizarGraficoD3() {
     .attr("height", height)
     .attr("viewBox", `0 0 ${width} ${height}`);
 
-  const x = d3.scaleBand().range([25, width - 15]).domain(dataset.map(d => d.categoria)).padding(0.35);
+  const x = d3.scaleBand().range([20, width - 15]).domain(dataset.map(d => d.categoria)).padding(0.32);
   const y = d3.scaleLinear().range([height - 22, 18]).domain([0, d3.max(dataset, d => d.stock) || 10]);
 
   svg.selectAll(".barra")
@@ -1472,10 +1583,10 @@ function renderizarGraficoD3() {
     .attr("x", d => x(d.categoria) + x.bandwidth() / 2)
     .attr("y", height - 6)
     .attr("text-anchor", "middle")
-    .style("font-size", "10px")
+    .style("font-size", "9px")
     .style("font-weight", "700")
     .style("fill", "#94a3b8")
-    .text(d => d.categoria);
+    .text(d => d.categoria.length > 10 ? d.categoria.slice(0, 9) + '.' : d.categoria);
 
   svg.selectAll(".texto-barra")
     .data(dataset)
