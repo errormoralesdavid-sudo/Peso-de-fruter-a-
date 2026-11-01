@@ -1,13 +1,13 @@
 /* ==========================================================
-   STYLES.CSS - SISTEMA ÚNICO ENTERPRISE (DARK SLATE & EMERALD)
+   STYLES.CSS - INTERFAZ 3D ENTERPRISE & VISOR QR DE ALTA LECTURA
    ========================================================== */
 :root {
   --bg-main: #0b131e;
   --bg-gradient: radial-gradient(circle at top right, #162a3a 0%, #0b131e 65%, #070c14 100%);
   --surface: rgba(22, 34, 51, 0.78);
-  --surface-elevated: rgba(30, 45, 66, 0.92);
-  --surface-solid: #162233;
-  --border-glass: rgba(255, 255, 255, 0.12);
+  --surface-elevated: rgba(30, 45, 66, 0.94);
+  --surface-solid: #131e2e;
+  --border-glass: rgba(255, 255, 255, 0.11);
   --border-highlight: rgba(16, 185, 129, 0.45);
   --primary: #10b981;
   --primary-dark: #059669;
@@ -17,8 +17,8 @@
   --danger: #ef4444;
   --text: #f8fafc;
   --text-muted: #94a3b8;
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.45);
-  --transition-fast: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  --shadow-lg: 0 18px 42px rgba(0, 0, 0, 0.5);
+  --transition-fast: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 * {
@@ -85,7 +85,7 @@ svg {
 .toast.aviso { border-left: 4px solid var(--amber); }
 
 /* ==========================================================
-   1. PANTALLA DE BIENVENIDA
+   1. PANTALLA DE BIENVENIDA CON RENDER 3D
    ========================================================== */
 #pantalla-inicio {
   display: flex;
@@ -101,7 +101,7 @@ svg {
   backdrop-filter: blur(20px);
   border: 1px solid var(--border-glass);
   border-radius: 32px;
-  padding: 48px 40px;
+  padding: 46px 40px;
   max-width: 580px;
   width: 100%;
   box-shadow: var(--shadow-lg);
@@ -111,18 +111,15 @@ svg {
 }
 
 .logo-bienvenida {
-  width: 120px;
-  height: 120px;
+  width: 135px;
+  height: 135px;
   object-fit: contain;
-  margin-bottom: 24px;
-  border-radius: 26px;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 16px;
-  border: 1px solid var(--border-glass);
+  margin-bottom: 20px;
+  filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.55));
 }
 
 #pantalla-inicio h1 {
-  font-size: 2.2rem;
+  font-size: 2.15rem;
   font-weight: 900;
   letter-spacing: -0.5px;
   margin-bottom: 16px;
@@ -143,9 +140,9 @@ svg {
 }
 
 .subtitulo-inicio {
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   color: var(--text-muted);
-  margin-bottom: 32px;
+  margin-bottom: 30px;
   font-weight: 600;
 }
 
@@ -154,11 +151,11 @@ svg {
   align-items: center;
   gap: 14px;
   padding: 18px 48px;
-  font-size: 1.35rem;
+  font-size: 1.3rem;
   border: none;
   border-radius: 50px;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: #fff;
+  color: #041d12;
   font-weight: 900;
   cursor: pointer;
   box-shadow: 0 12px 28px var(--primary-glow);
@@ -188,7 +185,7 @@ svg {
   align-items: center;
   border-bottom: 1px solid var(--border-glass);
   z-index: 10;
-   gap: 12px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -198,12 +195,10 @@ svg {
   gap: 12px;
 }
 .header-logo {
-  height: 42px;
-  width: 42px;
+  height: 44px;
+  width: 44px;
   object-fit: contain;
-  border-radius: 10px;
-  background: rgba(255,255,255,0.06);
-  padding: 4px;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.4));
 }
 .header-titulo {
   font-size: 1.05rem;
@@ -280,7 +275,7 @@ svg {
 .btn-tara {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid var(--border-glass);
-  padding: 2px 10px;
+  padding: 3px 10px;
   border-radius: 6px;
   font-weight: 800;
   font-size: 0.72rem;
@@ -317,12 +312,12 @@ svg {
 .btn-hw { color: #6ee7b7; }
 
 /* ==========================================================
-   3. NAVEGACIÓN, BUSCADOR Y GRILLAS
+   3. BOTONES VISUALES 3D SIN FONDO (CATEGORÍAS Y PRODUCTOS)
    ========================================================== */
 .contenedor-cuerpo {
   flex: 1;
   overflow-y: auto;
-  padding: 22px;
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
 }
@@ -331,7 +326,7 @@ svg {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -345,7 +340,7 @@ svg {
 .btn-volver-cat {
   background: var(--surface-elevated);
   color: var(--text);
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--border-highlight);
   padding: 9px 16px;
   border-radius: 12px;
   font-weight: 800;
@@ -355,7 +350,7 @@ svg {
   gap: 8px;
   transition: var(--transition-fast);
 }
-.btn-volver-cat:hover { border-color: var(--primary); transform: translateX(-2px); }
+.btn-volver-cat:hover { background: var(--primary); color: #000; }
 
 .titulo-seccion {
   font-weight: 900;
@@ -392,18 +387,57 @@ svg {
 .input-busqueda::placeholder { color: var(--text-muted); }
 .input-busqueda:focus { border-color: var(--primary); background: var(--surface-elevated); }
 
-/* CATEGORÍAS */
+/* PÍLDORAS RÁPIDAS 3D (QUICK-TABS) */
+.quick-cats-bar {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  margin-bottom: 10px;
+  scrollbar-width: none;
+}
+.quick-cats-bar::-webkit-scrollbar { display: none; }
+
+.quick-cat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 30px;
+  background: var(--surface);
+  border: 1px solid var(--border-glass);
+  color: var(--text-muted);
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition-fast);
+}
+.quick-cat-pill img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 5px rgba(0,0,0,0.4));
+}
+.quick-cat-pill:hover, .quick-cat-pill.active {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: var(--primary);
+  color: var(--text);
+  transform: translateY(-2px);
+}
+
+/* TARJETAS DE CATEGORÍAS 3D */
 .grid-categorias {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+  gap: 20px;
   width: 100%;
 }
 
 .card-categoria {
-  background: var(--surface);
-  border-radius: 22px;
-  padding: 28px 18px;
+  background: linear-gradient(160deg, rgba(30, 45, 66, 0.75) 0%, rgba(15, 24, 38, 0.9) 100%);
+  border-radius: 24px;
+  padding: 26px 18px;
   text-align: center;
   border: 1px solid var(--border-glass);
   cursor: pointer;
@@ -412,48 +446,66 @@ svg {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  position: relative;
+  overflow: hidden;
 }
-.card-categoria:hover {
-  transform: translateY(-5px);
-  border-color: var(--primary);
-  background: var(--surface-elevated);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
-}
-
-.icon-cat {
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
-  background: rgba(16, 185, 129, 0.12);
-  color: var(--primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 14px;
+.card-categoria::before {
+  content: '';
+  position: absolute;
+  top: 15%;
+  width: 95px;
+  height: 95px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.22) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
   transition: var(--transition-fast);
 }
-.icon-cat svg { width: 34px; height: 34px; }
-.card-categoria:hover .icon-cat {
-  background: var(--primary);
-  color: #070c14;
-  transform: scale(1.08);
+.card-categoria:hover {
+  transform: translateY(-6px);
+  border-color: var(--primary);
+  box-shadow: 0 16px 35px rgba(0, 0, 0, 0.45);
 }
-.card-categoria h3 {
-  font-size: 1.1rem;
-  font-weight: 800;
+.card-categoria:hover::before {
+  transform: scale(1.35);
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.38) 0%, transparent 70%);
 }
 
-/* PRODUCTOS */
+.img-3d-cat {
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+  margin-bottom: 14px;
+  filter: drop-shadow(0 14px 16px rgba(0, 0, 0, 0.55));
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 1;
+}
+.card-categoria:hover .img-3d-cat {
+  transform: scale(1.14) translateY(-4px) rotate(3deg);
+}
+.card-categoria h3 {
+  font-size: 1.12rem;
+  font-weight: 900;
+  z-index: 1;
+}
+.card-categoria .cat-sub-count {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-top: 4px;
+  z-index: 1;
+}
+
+/* TARJETAS DE PRODUCTOS VISUALES 3D SIN FONDO */
 .grid-productos {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 18px;
   width: 100%;
 }
 
 .card-producto {
-  background: var(--surface);
-  border-radius: 20px;
+  background: linear-gradient(165deg, rgba(28, 42, 62, 0.82) 0%, rgba(14, 22, 34, 0.94) 100%);
+  border-radius: 22px;
   padding: 14px;
   text-align: center;
   cursor: pointer;
@@ -467,18 +519,36 @@ svg {
   overflow: hidden;
 }
 .card-producto:hover {
-  transform: translateY(-5px);
+  transform: translateY(-6px);
   border-color: var(--primary);
-  background: var(--surface-elevated);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
 }
-.card-producto img {
+
+.stage-3d {
   width: 100%;
-  height: 115px;
-  object-fit: cover;
-  border-radius: 14px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.07) 0%, transparent 70%);
+  border-radius: 16px;
   margin-bottom: 10px;
-  background: #070c14;
+  padding: 8px;
 }
+
+.card-producto img {
+  max-width: 100%;
+  max-height: 104px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 14px rgba(0, 0, 0, 0.5));
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.card-producto:hover img {
+  transform: scale(1.12) translateY(-3px);
+}
+
 .card-producto h4 {
   font-size: 1rem;
   margin-bottom: 4px;
@@ -492,7 +562,7 @@ svg {
 .card-producto .precio-usd {
   color: var(--primary);
   font-weight: 900;
-  font-size: 1.15rem;
+  font-size: 1.18rem;
 }
 .card-producto .precio-bs {
   color: var(--text-muted);
@@ -501,31 +571,52 @@ svg {
   margin-top: 2px;
 }
 
+.btn-touch-elegir {
+  margin-top: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid var(--border-highlight);
+  color: #6ee7b7;
+  font-weight: 800;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: var(--transition-fast);
+}
+.card-producto:hover .btn-touch-elegir {
+  background: var(--primary);
+  color: #03180e;
+}
+
 .badge-oferta {
   position: absolute; top: 10px; right: 10px;
   background: var(--amber); color: #000;
   font-size: 0.68rem; font-weight: 900;
-  padding: 3px 8px; border-radius: 8px;
+  padding: 3px 8px; border-radius: 8px; z-index: 2;
 }
 .badge-remate {
   position: absolute; top: 10px; right: 10px;
   background: var(--danger); color: #fff;
   font-size: 0.68rem; font-weight: 900;
-  padding: 3px 8px; border-radius: 8px;
+  padding: 3px 8px; border-radius: 8px; z-index: 2;
 }
 .badge-barcode {
   position: absolute; top: 10px; left: 10px;
-  background: rgba(7, 12, 20, 0.85);
+  background: rgba(7, 12, 20, 0.82);
   color: var(--text-muted);
   font-size: 0.65rem; font-weight: 800;
-  padding: 3px 8px; border-radius: 6px;
+  padding: 3px 8px; border-radius: 6px; z-index: 2;
 }
 .badge-stock {
   font-size: 0.72rem; font-weight: 800;
   padding: 3px 10px; border-radius: 8px;
   margin-top: 6px; display: inline-block;
 }
-.stock-ok { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+.stock-ok { background: rgba(16, 185, 129, 0.14); color: #6ee7b7; }
 .stock-low { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
 .stock-out { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
 .precio-tachado { text-decoration: line-through; color: var(--text-muted); font-size: 0.8rem; margin-left: 4px; }
@@ -538,8 +629,8 @@ svg {
   bottom: 26px;
   right: 26px;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: #fff;
-  border: 2px solid rgba(255,255,255,0.2);
+  color: #03180e;
+  border: 2px solid rgba(255,255,255,0.25);
   border-radius: 50%;
   width: 68px;
   height: 68px;
@@ -574,22 +665,20 @@ svg {
   position: fixed;
   z-index: 9999;
   pointer-events: none;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  object-fit: cover;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-  border: 2px solid var(--primary);
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 18px rgba(0,0,0,0.6));
 }
 
 /* ==========================================================
-   5. MODALES, AUTOPAGO QR SUICHE 7B Y NUMPAD TÁCTIL
+   5. MODALES, VISOR GRANDE DE TU IMAGEN QR Y COPIADO RÁPIDO
    ========================================================== */
 .modal {
   display: none;
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(5, 9, 15, 0.78);
+  background: rgba(5, 9, 15, 0.82);
   backdrop-filter: blur(10px);
   justify-content: center;
   align-items: center;
@@ -611,7 +700,7 @@ svg {
   overflow-y: auto;
   border: 1px solid var(--border-glass);
 }
-.modal-carrito-ancho { max-width: 580px !important; }
+.modal-carrito-ancho { max-width: 610px !important; }
 .modal-admin-ancho { max-width: 660px !important; }
 
 .text-center { text-align: center; }
@@ -620,13 +709,21 @@ svg {
 .modal-titulo { font-weight: 900; font-size: 1.25rem; margin-bottom: 8px; }
 .texto-ayuda-modal { font-size: 0.88rem; color: var(--text-muted); margin-bottom: 12px; }
 
-.modal-prod-imagen {
-  width: 120px; height: 120px;
-  border-radius: 18px;
-  margin: 10px auto;
-  object-fit: cover;
-  display: block;
-  border: 1px solid var(--border-glass);
+.modal-img-3d-stage {
+  width: 150px;
+  height: 150px;
+  margin: 8px auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.18) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.modal-prod-imagen-3d {
+  max-width: 130px;
+  max-height: 130px;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 18px rgba(0,0,0,0.55));
 }
 
 .modal-peso-texto { font-size: 1.05rem; color: var(--text-muted); font-weight: 700; margin-bottom: 8px; }
@@ -663,9 +760,34 @@ svg {
   border-radius: 16px;
   margin: 12px 0;
 }
-.modal-totales-box.compacto { padding: 10px; margin: 10px 0; }
-.modal-precio-usd { font-size: 1.65rem; color: var(--primary); font-weight: 900; }
+.modal-totales-box.compacto { padding: 10px 14px; margin: 10px 0; }
+.modal-precio-usd { font-size: 1.6rem; color: var(--primary); font-weight: 900; }
 .modal-precio-bs { font-size: 1.15rem; color: var(--text); font-weight: 800; margin-top: 2px; }
+
+.modal-precio-bs-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin-top: 4px;
+}
+
+.btn-copy-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid var(--border-glass);
+  color: var(--text);
+  padding: 3px 9px;
+  border-radius: 8px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.btn-copy-inline:hover { background: var(--primary); color: #000; }
 
 /* Barra Auditoría Antirrobo */
 .auditoria-peso-bar {
@@ -707,7 +829,7 @@ svg {
   color: var(--text);
 }
 
-/* Panel QR Bancario Suiche 7B */
+/* VISOR GRANDE PARA TU IMAGEN DE QR BANCARIO */
 .seccion-autopago {
   background: rgba(0, 0, 0, 0.25);
   padding: 14px;
@@ -719,11 +841,11 @@ svg {
 
 .autopago-grid {
   display: grid;
-  grid-template-columns: 210px 1fr;
+  grid-template-columns: 245px 1fr;
   gap: 16px;
   align-items: center;
 }
-@media (max-width: 540px) {
+@media (max-width: 580px) {
   .autopago-grid { grid-template-columns: 1fr; justify-items: center; }
 }
 
@@ -732,17 +854,61 @@ svg {
   flex-direction: column;
   align-items: center;
 }
-.qr-canvas-wrapper {
+
+.qr-imagen-grande-wrapper {
   background: #ffffff;
+  width: 235px;
+  height: 235px;
   padding: 10px;
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  border-radius: 18px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
   display: flex;
   justify-content: center;
   align-items: center;
+  cursor: zoom-in;
+  transition: var(--transition-fast);
 }
+.qr-imagen-grande-wrapper:hover { transform: scale(1.03); }
+
+.qr-img-fija {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.qr-sin-imagen-box {
+  color: #334155;
+  text-align: center;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.qr-fullscreen-box {
+  background: #ffffff;
+  width: 310px;
+  height: 310px;
+  margin: 0 auto;
+  padding: 14px;
+  border-radius: 22px;
+  box-shadow: 0 12px 35px rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.qr-fullscreen-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .qr-caption {
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 800;
   color: var(--text-muted);
   margin-top: 6px;
@@ -759,9 +925,26 @@ svg {
 .dato-fila {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 4px;
+  align-items: center;
+  margin-bottom: 6px;
 }
+.dato-fila:last-child { margin-bottom: 0; }
 .dato-fila span { color: var(--text-muted); }
+
+.dato-valor-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-icon-copy {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--border-glass);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 3px 5px;
+  cursor: pointer;
+}
+.btn-icon-copy:hover { color: #000; background: var(--primary); }
 
 .estado-listener-vivo {
   display: flex;
@@ -859,7 +1042,7 @@ svg {
 .key-back { color: var(--amber); }
 
 /* ==========================================================
-   6. BOTONES, ADMIN Y TICKET
+   6. BOTONES, ADMIN Y CÓDIGO DE BARRAS SVG DEL TICKET
    ========================================================== */
 .modal-botones-row { display: flex; gap: 10px; margin-top: 14px; }
 .modal-botones-col { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
@@ -926,10 +1109,10 @@ svg {
   font-size: 0.88rem;
   border-radius: 12px;
 }
-.qr-auditoria-box {
-  background: #fff;
-  padding: 8px;
-  border-radius: 12px;
+.barcode-auditoria-box {
+  background: #ffffff;
+  padding: 8px 14px;
+  border-radius: 10px;
   display: inline-flex;
   margin-top: 10px;
 }
@@ -966,6 +1149,6 @@ svg {
 .link-sincronizar { margin-top: 6px; font-size: 0.82rem; background: none; border: none; color: var(--primary); text-decoration: underline; cursor: pointer; font-weight: 800; display: block; }
 
 .lista-admin-scroll { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-.lista-carrito-scroll { max-height: 170px; overflow-y: auto; text-align: left; margin-bottom: 10px; border-top: 1px solid var(--border-glass); border-bottom: 1px solid var(--border-glass); padding: 8px 0; }
+.lista-carrito-scroll { max-height: 160px; overflow-y: auto; text-align: left; margin-bottom: 10px; border-top: 1px solid var(--border-glass); border-bottom: 1px solid var(--border-glass); padding: 8px 0; }
 .preview-img-box { text-align: center; margin-bottom: 10px; }
-.preview-img-box img { width: 80px; height: 80px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border-glass); }
+.preview-img-box img { width: 80px; height: 80px; object-fit: contain; border-radius: 10px; border: 1px solid var(--border-glass); }
