@@ -1,10 +1,9 @@
 /* ==========================================================
-   SW.JS - SERVICE WORKER V2 (SOPORTE OFFLINE + MOTOR QR SUICHE 7B)
+   SW.JS - SERVICE WORKER V3 (SOPORTE OFFLINE + CATÁLOGO 3D)
    ========================================================== */
 
-const CACHE_NAME = 'bascula-pos-pro-cache-v6';
+const CACHE_NAME = 'bascula-pos-pro-cache-v7';
 
-// Recursos estáticos esenciales (incluye Anime.js, Lodash, D3.js y Motor QR)
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -13,42 +12,32 @@ const ASSETS_TO_CACHE = [
   './manifest.json',
   'https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js',
-  'https://cdn-icons-png.flaticon.com/512/1046/1046857.png'
+  'https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js'
 ];
 
-// 1. INSTALACIÓN: Guarda en caché el núcleo de la Súper App
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
   );
   self.skipWaiting();
 });
 
-// 2. ACTIVACIÓN: Limpia versiones viejas (v1) automáticamente al actualizar en GitHub
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
+    caches.keys().then((cacheNames) =>
+      Promise.all(
         cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
-          }
+          if (cache !== CACHE_NAME) return caches.delete(cache);
         })
-      );
-    })
+      )
+    )
   );
   self.clients.claim();
 });
 
-// 3. INTERCEPTOR DE RED (FETCH): Protege Firestore y tasas BCV en vivo
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // REGLA DE SEGURIDAD FINANCIERA: Nunca cachear validaciones de pago ni tasas de cambio
   if (
     url.hostname.includes('firestore.googleapis.com') ||
     url.hostname.includes('gstatic.com') ||
@@ -56,15 +45,12 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('dolarapi.com') ||
     event.request.method !== 'GET'
   ) {
-    return; // Pasa directo a internet en tiempo real
+    return;
   }
 
-  // Estrategia Cache-First con actualización dinámica para imágenes de productos
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
+      if (cachedResponse) return cachedResponse;
 
       return fetch(event.request)
         .then((networkResponse) => {
@@ -75,12 +61,8 @@ self.addEventListener('fetch', (event) => {
           ) {
             return networkResponse;
           }
-
           const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
           return networkResponse;
         })
         .catch(() => {
