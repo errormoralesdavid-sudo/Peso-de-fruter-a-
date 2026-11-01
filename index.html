@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0b131e">
-  <meta name="description" content="Terminal Kiosco Báscula POS Inteligente con Autopago QR Suiche 7B, Control Antirrobo e Inventario">
-  <title>Báscula POS Pro — Autopago</title>
+  <meta name="description" content="Terminal Kiosco Báscula POS Inteligente con Catálogo 3D, Autopago Bancario e Inventario">
+  <title>Báscula POS Pro — Autopago 3D</title>
   
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
@@ -14,14 +14,12 @@
   <link rel="stylesheet" href="styles.css">
 
   <!-- Librerías Externas (Licencia MIT - Seguras para Producción en GitHub) -->
-  <!-- Anime.js para animaciones físicas y de interfaz -->
+  <!-- Anime.js para animaciones físicas y levitación 3D -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js" defer></script>
   <!-- Lodash para optimización de búsqueda (debounce) y colecciones -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js" defer></script>
   <!-- D3.js para analítica visual en el Panel Admin -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js" defer></script>
-  <!-- QRCode Generator para motor QR Bancario Suiche 7B (Nivel H con logo central) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" defer></script>
 </head>
 <body>
 
@@ -31,7 +29,7 @@
   <!-- 1. PANTALLA DE BIENVENIDA (INICIO) -->
   <section id="pantalla-inicio" class="pantalla-activa">
     <div class="hero-card-inicio">
-      <img id="img-logo-bienvenida" class="logo-bienvenida" src="https://cdn-icons-png.flaticon.com/512/1046/1046857.png" alt="Logo Comercio">
+      <img id="img-logo-bienvenida" class="logo-bienvenida" src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Shopping%20Cart.png" alt="Logo Comercio">
       <h1>Terminal de Autoservicio & Báscula</h1>
       
       <div class="badge-tasa-inicio">
@@ -58,7 +56,7 @@
   <main id="pantalla-kiosco" style="display: none;">
     <header class="kiosco-header">
       <div class="header-logo-container">
-        <img id="img-logo-header" class="header-logo" src="https://cdn-icons-png.flaticon.com/512/1046/1046857.png" alt="Logo">
+        <img id="img-logo-header" class="header-logo" src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Shopping%20Cart.png" alt="Logo">
         <div>
           <h2 class="header-titulo">BÁSCULA POS PRO</h2>
           <button id="btn-actualizar-tasa-header" class="tasa-ticker" type="button" title="Sincronizar tasa BCV">
@@ -122,10 +120,12 @@
         <div class="nav-categorias-box">
           <button class="btn-volver-cat" id="btn-volver" type="button">
             <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
+              <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+              <rect x="3" y="14" width="7" height="7" rx="1"></rect>
             </svg>
-            <span>Categorías</span>
+            <span>Inicio Categorías</span>
           </button>
           <h2 id="titulo-seccion" class="titulo-seccion">Seleccione una Categoría</h2>
         </div>
@@ -136,82 +136,17 @@
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <input type="search" class="input-busqueda" id="input-buscar" placeholder="Buscar por nombre o escanear código de barras..." autocomplete="off">
+          <input type="search" class="input-busqueda" id="input-buscar" placeholder="Buscar producto o escanear código..." autocomplete="off">
         </div>
       </div>
 
-      <!-- VISTA 1: 6 CATEGORÍAS CON ICONOS SVG VECTORIALES -->
-      <div class="grid-categorias" id="vista-categorias">
-        <div class="card-categoria" data-categoria="Frutería">
-          <div class="icon-cat">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"></path>
-              <path d="M10 2c1 .5 2 2 2 5"></path>
-            </svg>
-          </div>
-          <h3>Frutería</h3>
-        </div>
+      <!-- PÍLDORAS VISUALES 3D DE CAMBIO RÁPIDO (Visible al elegir productos) -->
+      <div id="barra-quick-cats" class="quick-cats-bar" style="display: none;"></div>
 
-        <div class="card-categoria" data-categoria="Verdulería">
-          <div class="icon-cat">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M2.27 21.7s9.87-3.5 12.73-6.36a4.5 4.5 0 0 0-6.36-6.37C5.77 11.84 2.27 21.7 2.27 21.7z"></path>
-              <path d="M8.64 14l-2.05-2.04M15.34 15l-2.46-2.46"></path>
-              <path d="M22 9s-1.33-2-3.5-2C16.86 7 15 9 15 9s1.33 2 3.5 2S22 9 22 9z"></path>
-              <path d="M15 2s-2 1.33-2 3.5S15 9 15 9s2-1.84 2-3.5C17 3.33 15 2 15 2z"></path>
-            </svg>
-          </div>
-          <h3>Verdulería</h3>
-        </div>
+      <!-- VISTA 1: 6 CATEGORÍAS CON BOTONES VISUALES 3D SIN FONDO (Renderizado dinámico) -->
+      <div class="grid-categorias" id="vista-categorias"></div>
 
-        <div class="card-categoria" data-categoria="Manicería">
-          <div class="icon-cat">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M12 2a4 4 0 0 0-4 4v2a4 4 0 0 0 2 3.46V12.5a4 4 0 0 0-2 3.46V18a4 4 0 0 0 8 0v-2.04a4 4 0 0 0-2-3.46v-1.04A4 4 0 0 0 16 8V6a4 4 0 0 0-4-4z"></path>
-              <circle cx="10.5" cy="6.5" r=".5"></circle>
-              <circle cx="13.5" cy="17.5" r=".5"></circle>
-            </svg>
-          </div>
-          <h3>Manicería</h3>
-        </div>
-
-        <div class="card-categoria" data-categoria="Granos">
-          <div class="icon-cat">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <ellipse cx="9" cy="12" rx="5" ry="7" transform="rotate(-20 9 12)"></ellipse>
-              <path d="M7 7c2 3 2 7 0 10"></path>
-              <ellipse cx="16" cy="13" rx="4" ry="6" transform="rotate(15 16 13)"></ellipse>
-            </svg>
-          </div>
-          <h3>Granos</h3>
-        </div>
-
-        <div class="card-categoria" data-categoria="Charcutería">
-          <div class="icon-cat">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M3 10l9-6 9 6v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9z"></path>
-              <path d="M3 10h18"></path>
-              <circle cx="8" cy="15" r="1.5"></circle>
-              <circle cx="15" cy="16" r="2"></circle>
-            </svg>
-          </div>
-          <h3>Charcutería</h3>
-        </div>
-
-        <!-- NUEVA CATEGORÍA 6: VARIOS / EMPAQUES (PRODUCTOS POR UNIDAD) -->
-        <div class="card-categoria" data-categoria="Varios / Empaques">
-          <div class="icon-cat">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-              <line x1="12" y1="22.08" x2="12" y2="12"></line>
-            </svg>
-          </div>
-          <h3>Varios / Empaques</h3>
-        </div>
-      </div>
-
-      <!-- VISTA 2: GRID DE PRODUCTOS -->
+      <!-- VISTA 2: GRID DE PRODUCTOS VISUALES 3D -->
       <div class="grid-productos" id="vista-productos" style="display: none;"></div>
     </div>
 
@@ -230,7 +165,9 @@
   <div class="modal" id="modal-confirmar" role="dialog" aria-modal="true">
     <div class="modal-contenido text-center">
       <h2 id="modal-prod-nombre" class="modal-titulo">Producto</h2>
-      <img id="modal-prod-img" class="modal-prod-imagen" src="" alt="Producto seleccionado">
+      <div class="modal-img-3d-stage">
+        <img id="modal-prod-img" class="modal-prod-imagen-3d" src="" alt="Producto seleccionado">
+      </div>
       
       <!-- Modo 1: Venta por Peso -->
       <div id="bloque-modo-peso" class="modal-peso-texto">
@@ -257,13 +194,17 @@
       <div class="modal-botones-row">
         <button class="btn-action btn-secundario" type="button" data-close="modal-confirmar">Cancelar</button>
         <button class="btn-action btn-primario" id="btn-confirmar-agregar" type="button">
+          <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
           <span>Agregar al Carrito</span>
         </button>
       </div>
     </div>
   </div>
 
-  <!-- MODAL 2: CARRITO, AUDITORÍA DE PESO Y AUTOPAGO QR SUICHE 7B -->
+  <!-- MODAL 2: CARRITO, AUDITORÍA DE PESO Y AUTOPAGO CON TU IMAGEN QR BANCARIA -->
   <div class="modal" id="modal-carrito" role="dialog" aria-modal="true">
     <div class="modal-contenido modal-carrito-ancho text-center">
       <div class="admin-header-bar">
@@ -286,7 +227,7 @@
         <span>Peso esperado en bolsa: <b id="peso-esperado-cart">0g</b> | En balanza: <b id="peso-actual-cart">0g</b></span>
       </div>
 
-      <!-- Selector de Método de Pago (Pago Móvil Bs vs Divisas con IGTF 3%) -->
+      <!-- Selector de Método de Pago -->
       <div class="tabs-metodo-pago">
         <button type="button" id="tab-pagomovil" class="tab-pago active">Pago Móvil QR (Bs)</button>
         <button type="button" id="tab-divisas" class="tab-pago">Divisas / Efectivo (+IGTF 3%)</button>
@@ -294,36 +235,76 @@
 
       <div class="modal-totales-box compacto">
         <div class="modal-precio-usd">Total: $<span id="cart-total-usd">0.00</span> <small id="badge-igtf-activo" style="display:none; font-size:0.75rem; color:#f59e0b;">(Incl. 3% IGTF)</small></div>
-        <div class="modal-precio-bs">Bs. <span id="cart-total-bs">0.00</span></div>
+        <div class="modal-precio-bs-row">
+          <span>Bs. <b id="cart-total-bs">0.00</b></span>
+          <button type="button" id="btn-copiar-monto" class="btn-copy-inline" title="Copiar monto exacto en Bs">
+            <svg class="svg-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>Copiar Bs</span>
+          </button>
+        </div>
       </div>
 
-      <!-- PANEL A: AUTOPAGO BANCARIO QR SUICHE 7B + FIRESTORE EN VIVO -->
+      <!-- PANEL A: AUTOPAGO CON LA IMAGEN DE TU QR DEL CELULAR GRANDE + FIRESTORE EN VIVO -->
       <div id="panel-autopago-qr" class="seccion-autopago">
         <div class="autopago-grid">
-          <!-- Columna Izquierda: QR Suiche 7B Oficial o Imagen Subida -->
+          <!-- Columna Izquierda: Tu Imagen QR Oficial en Grande -->
           <div class="qr-bancario-card">
-            <div class="qr-canvas-wrapper" id="btn-zoom-qr" title="Toca para ampliar o descargar solo el QR">
-              <canvas id="qr-suiche-canvas" width="260" height="260" style="width:190px; height:190px;"></canvas>
-              <img id="qr-custom-img" src="" alt="QR Bancario" style="display:none; width:190px; height:190px; object-fit:contain;">
+            <div class="qr-imagen-grande-wrapper" id="btn-ampliar-qr" title="Toca para ver el QR en pantalla gigante">
+              <img id="qr-custom-img" src="" alt="Código QR Pago Móvil" class="qr-img-fija">
+              <div id="qr-placeholder-aviso" class="qr-sin-imagen-box" style="display:none;">
+                <svg class="svg-icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <rect x="3" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="14" width="7" height="7"></rect>
+                  <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                <span>Sube la imagen de tu QR en el Panel Admin</span>
+              </div>
             </div>
-            <div style="display:flex; gap:6px; margin-top:6px;">
-              <button type="button" id="btn-descargar-qr-limpio" class="btn-tara" title="Descargar imagen limpia del QR para adjuntar en Tpago/BDV">
-                Guardar QR Limpio
-              </button>
-            </div>
+            <span class="qr-caption">Toca el QR para ampliarlo al máximo</span>
           </div>
 
-          <!-- Columna Derecha: Datos del Comercio + Verificación -->
+          <!-- Columna Derecha: Datos del Comercio con Copiado Rápido + Verificación -->
           <div class="datos-autopago-col">
             <div class="datos-comercio-box">
-              <div class="dato-fila"><span>Banco:</span> <b id="lbl-banco-comercio">0102 - Banco de Venezuela</b></div>
-              <div class="dato-fila"><span>RIF / CI:</span> <b id="lbl-rif-comercio">V30629336</b></div>
-              <div class="dato-fila"><span>Teléfono:</span> <b id="lbl-tel-comercio">04123167126</b></div>
+              <div class="dato-fila">
+                <span>Banco:</span>
+                <div class="dato-valor-copy">
+                  <b id="lbl-banco-comercio">0102 - Banco de Venezuela</b>
+                </div>
+              </div>
+              <div class="dato-fila">
+                <span>RIF / CI:</span>
+                <div class="dato-valor-copy">
+                  <b id="lbl-rif-comercio">V30629336</b>
+                  <button type="button" class="btn-icon-copy" data-copy-target="lbl-rif-comercio" title="Copiar Cédula/RIF">
+                    <svg class="svg-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="dato-fila">
+                <span>Teléfono:</span>
+                <div class="dato-valor-copy">
+                  <b id="lbl-tel-comercio">04123167126</b>
+                  <button type="button" class="btn-icon-copy" data-copy-target="lbl-tel-comercio" title="Copiar Teléfono">
+                    <svg class="svg-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div class="estado-listener-vivo">
               <span class="pulse-dot"></span>
-              <span>Escuchando pago en tiempo real...</span>
+              <span>Escuchando tu pago en tiempo real...</span>
             </div>
 
             <label for="ref-pago-input">O ingresa los últimos 6 dígitos de referencia:</label>
@@ -353,16 +334,30 @@
       </div>
     </div>
   </div>
+
+  <!-- MODAL ZOOM PANTALLA GIGANTE PARA TU IMAGEN QR -->
+  <div class="modal" id="modal-qr-fullscreen" role="dialog" aria-modal="true">
+    <div class="modal-contenido text-center" style="max-width: 400px;">
+      <h3 class="modal-titulo">Escanea desde tu Banco</h3>
+      <p class="texto-ayuda-modal">Monto exacto a pagar: <b id="zoom-qr-monto-bs" style="color:var(--primary); font-size:1.1rem;">Bs. 0.00</b></p>
+      <div class="qr-fullscreen-box">
+        <img id="qr-fullscreen-img" src="" alt="QR Gigante">
+      </div>
+      <div class="modal-botones-row">
+        <button class="btn-action btn-primario w-100" type="button" data-close="modal-qr-fullscreen">Listo, Volver al Carrito</button>
+      </div>
+    </div>
+  </div>
   
-  <!-- MODAL 3: TICKET GENERADO CON QR DE AUDITORÍA DE SALIDA -->
+  <!-- MODAL 3: TICKET GENERADO CON CÓDIGO DE BARRAS VECTORIAL SVG -->
   <div class="modal" id="modal-ticket" role="dialog" aria-modal="true">
     <div class="modal-contenido text-center">
       <h2 class="modal-titulo">Comprobante Digital Emitido</h2>
-      <p class="texto-ayuda-modal">Presente este código de auditoría en la salida o consérvelo.</p>
+      <p class="texto-ayuda-modal">Presente este comprobante en la salida o consérvelo.</p>
       
       <div class="ticket-impresion" id="contenido-ticket"></div>
-      <div class="qr-auditoria-box">
-        <canvas id="qr-ticket-auditoria" width="140" height="140"></canvas>
+      <div class="barcode-auditoria-box">
+        <svg id="svg-ticket-barcode" viewBox="0 0 240 60" width="220" height="55"></svg>
       </div>
 
       <div class="modal-botones-col">
@@ -466,9 +461,9 @@
         </div>
       </div>
 
-      <!-- Configuración Datos Bancarios + Subida de QR Propio del Banco -->
+      <!-- Configuración Datos Bancarios + Subida de la Imagen de tu QR del Celular -->
       <div class="bloque-admin">
-        <h4>Configuración Pago Móvil & QR Bancario (Suiche 7B / Propio)</h4>
+        <h4>Configuración Pago Móvil & Imagen de tu Código QR</h4>
         <div class="dos-columnas-form">
           <div>
             <label class="label-admin">Código y Nombre Banco:</label>
@@ -484,12 +479,40 @@
           <button class="btn-action btn-primario" id="btn-guardar-pm" type="button">Guardar Datos</button>
         </div>
 
-        <label class="label-admin" style="margin-top:8px;">Opcional: Subir imagen QR descargada directo de tu Banco:</label>
+        <label class="label-admin" style="margin-top:10px;">Imagen del Código QR de tu Banco (URL de GitHub o Subir de Galería):</label>
         <div class="fila-input-boton">
-          <button type="button" class="btn-action btn-secundario" id="btn-subir-qr-banco">Subir Imagen QR del Banco</button>
-          <button type="button" class="btn-action btn-naranja" id="btn-usar-qr-motor">Usar Motor Suiche 7B Automático</button>
+          <input type="url" id="adm-qr-url" class="input-form-admin" placeholder="Pega URL de tu QR en GitHub o sube de galería">
+          <button type="button" class="btn-action btn-secundario" id="btn-subir-qr-banco">Galería</button>
+          <button type="button" class="btn-action btn-primario" id="btn-guardar-qr-url">Fijar QR</button>
         </div>
         <input type="file" id="input-file-qr-banco" accept="image/*" style="display:none;">
+      </div>
+
+      <!-- Gestor de Imágenes 3D Sin Fondo para las Categorías -->
+      <div class="bloque-admin">
+        <h4>Personalizar Imágenes 3D Sin Fondo de Categorías (GitHub / PNG)</h4>
+        <div class="dos-columnas-form">
+          <div>
+            <label class="label-admin">Selecciona Categoría:</label>
+            <select id="adm-cat-3d-select" class="input-form-admin">
+              <option value="Frutería">Frutería</option>
+              <option value="Verdulería">Verdulería</option>
+              <option value="Manicería">Manicería</option>
+              <option value="Granos">Granos</option>
+              <option value="Charcutería">Charcutería</option>
+              <option value="Varios / Empaques">Varios / Empaques</option>
+            </select>
+          </div>
+          <div>
+            <label class="label-admin">URL PNG 3D (GitHub) o Galería:</label>
+            <div class="fila-input-boton">
+              <input type="url" id="adm-cat-3d-url" class="input-form-admin" placeholder="https://.../icono3d.png">
+              <button type="button" class="btn-action btn-secundario" id="btn-galeria-cat3d">PNG</button>
+            </div>
+            <input type="file" id="input-file-cat3d" accept="image/*" style="display:none;">
+          </div>
+        </div>
+        <button type="button" class="btn-action btn-primario w-100" id="btn-guardar-cat3d">Actualizar Icono 3D de Categoría</button>
       </div>
 
       <!-- Configuración Tasa BCV y Logo -->
@@ -507,10 +530,10 @@
         </div>
       </div>
 
-      <!-- Formulario Crear Producto (Híbrido: Peso o Unidad) -->
+      <!-- Formulario Crear Producto (Con soporte para Imágenes 3D transparentes) -->
       <div class="bloque-admin">
-        <h4>Registrar Nuevo Producto</h4>
-        <input type="text" id="adm-nombre" class="input-form-admin" placeholder="Nombre del producto (ej. Casabe / Fresa)">
+        <h4>Registrar Nuevo Producto (Soporta PNG 3D sin fondo)</h4>
+        <input type="text" id="adm-nombre" class="input-form-admin" placeholder="Nombre del producto (ej. Manzana Gala / Casabe)">
         
         <div class="dos-columnas-form">
           <div>
@@ -558,9 +581,9 @@
         <label class="label-admin">Fecha de Ingreso del Lote:</label>
         <input type="date" id="adm-fecha-ingreso" class="input-form-admin">
 
-        <label class="label-admin">Imagen del Producto (URL o Galería):</label>
+        <label class="label-admin">Imagen 3D del Producto (URL de tu GitHub o Galería):</label>
         <div class="fila-input-boton">
-          <input type="url" id="adm-img-url" class="input-form-admin" placeholder="Pega URL o selecciona de galería">
+          <input type="url" id="adm-img-url" class="input-form-admin" placeholder="Pega URL de tu PNG 3D en GitHub o sube de galería">
           <button type="button" class="btn-action btn-secundario" id="btn-galeria-add">Subir Galería</button>
         </div>
         <input type="file" id="img-gallery-add" accept="image/*" style="display:none;">
@@ -646,9 +669,9 @@
       <label class="label-admin">Fecha de Ingreso:</label>
       <input type="date" id="edit-prod-fecha" class="input-form-admin">
 
-      <label class="label-admin">Imagen (URL o Galería):</label>
+      <label class="label-admin">Imagen 3D (URL de GitHub o Galería):</label>
       <div class="fila-input-boton">
-        <input type="url" id="edit-prod-img-url" class="input-form-admin" placeholder="URL de la imagen">
+        <input type="url" id="edit-prod-img-url" class="input-form-admin" placeholder="URL de la imagen PNG 3D">
         <button type="button" class="btn-action btn-secundario" id="btn-galeria-edit">Galería</button>
       </div>
       <input type="file" id="img-gallery-edit" accept="image/*" style="display:none;">
