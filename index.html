@@ -140,7 +140,7 @@
         </div>
       </div>
 
-      <!-- VISTA 1: CATEGORÍAS CON ICONOS SVG VECTORIALES -->
+      <!-- VISTA 1: 6 CATEGORÍAS CON ICONOS SVG VECTORIALES -->
       <div class="grid-categorias" id="vista-categorias">
         <div class="card-categoria" data-categoria="Frutería">
           <div class="icon-cat">
@@ -197,6 +197,18 @@
           </div>
           <h3>Charcutería</h3>
         </div>
+
+        <!-- NUEVA CATEGORÍA 6: VARIOS / EMPAQUES (PRODUCTOS POR UNIDAD) -->
+        <div class="card-categoria" data-categoria="Varios / Empaques">
+          <div class="icon-cat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+              <line x1="12" y1="22.08" x2="12" y2="12"></line>
+            </svg>
+          </div>
+          <h3>Varios / Empaques</h3>
+        </div>
       </div>
 
       <!-- VISTA 2: GRID DE PRODUCTOS -->
@@ -227,7 +239,7 @@
 
       <!-- Modo 2: Venta por Unidad -->
       <div id="bloque-modo-unidad" class="selector-unidades-box" style="display:none;">
-        <span class="label-admin">Seleccione cantidad de unidades:</span>
+        <span class="label-admin text-center">Seleccione cantidad de unidades:</span>
         <div class="controles-unidad">
           <button type="button" id="btn-restar-unidad" class="btn-unidad-step">-</button>
           <span id="val-unidades" class="display-unidades">1</span>
@@ -288,20 +300,25 @@
       <!-- PANEL A: AUTOPAGO BANCARIO QR SUICHE 7B + FIRESTORE EN VIVO -->
       <div id="panel-autopago-qr" class="seccion-autopago">
         <div class="autopago-grid">
-          <!-- Columna Izquierda: QR Suiche 7B Idéntico a los Bancos -->
+          <!-- Columna Izquierda: QR Suiche 7B Oficial o Imagen Subida -->
           <div class="qr-bancario-card">
-            <div class="qr-canvas-wrapper">
-              <canvas id="qr-suiche-canvas" width="200" height="200"></canvas>
+            <div class="qr-canvas-wrapper" id="btn-zoom-qr" title="Toca para ampliar o descargar solo el QR">
+              <canvas id="qr-suiche-canvas" width="260" height="260" style="width:190px; height:190px;"></canvas>
+              <img id="qr-custom-img" src="" alt="QR Bancario" style="display:none; width:190px; height:190px; object-fit:contain;">
             </div>
-            <span class="qr-caption">Escanea desde tu App Bancaria</span>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+              <button type="button" id="btn-descargar-qr-limpio" class="btn-tara" title="Descargar imagen limpia del QR para adjuntar en Tpago/BDV">
+                Guardar QR Limpio
+              </button>
+            </div>
           </div>
 
           <!-- Columna Derecha: Datos del Comercio + Verificación -->
           <div class="datos-autopago-col">
             <div class="datos-comercio-box">
               <div class="dato-fila"><span>Banco:</span> <b id="lbl-banco-comercio">0102 - Banco de Venezuela</b></div>
-              <div class="dato-fila"><span>RIF / CI:</span> <b id="lbl-rif-comercio">V-12345678</b></div>
-              <div class="dato-fila"><span>Teléfono:</span> <b id="lbl-tel-comercio">0412-0000000</b></div>
+              <div class="dato-fila"><span>RIF / CI:</span> <b id="lbl-rif-comercio">V30629336</b></div>
+              <div class="dato-fila"><span>Teléfono:</span> <b id="lbl-tel-comercio">04123167126</b></div>
             </div>
 
             <div class="estado-listener-vivo">
@@ -325,9 +342,9 @@
         <div id="msg-autopago"></div>
       </div>
 
-      <!-- PANEL B: PAGO EN CAJA / DIVISAS CON CALCULADORA DE VUELTO -->
+      <!-- PANEL B: PAGO EN CAJA / DIVISAS -->
       <div id="panel-pago-divisas" class="seccion-autopago" style="display:none;">
-        <p class="texto-ayuda-modal">Pagos en divisas efectivo aplican 3% de IGTF según normativa SENIAT. Genere su ticket para cancelar en taquilla.</p>
+        <p class="texto-ayuda-modal">Pagos en divisas efectivo aplican 3% de IGTF según normativa SENIAT. Emita su ticket para cancelar en caja.</p>
       </div>
 
       <div class="modal-botones-row">
@@ -345,7 +362,7 @@
       
       <div class="ticket-impresion" id="contenido-ticket"></div>
       <div class="qr-auditoria-box">
-        <canvas id="qr-ticket-auditoria" width="130" height="130"></canvas>
+        <canvas id="qr-ticket-auditoria" width="140" height="140"></canvas>
       </div>
 
       <div class="modal-botones-col">
@@ -449,9 +466,9 @@
         </div>
       </div>
 
-      <!-- Configuración Datos Bancarios para QR Suiche 7B -->
+      <!-- Configuración Datos Bancarios + Subida de QR Propio del Banco -->
       <div class="bloque-admin">
-        <h4>Configuración Pago Móvil QR (Motor Suiche 7B)</h4>
+        <h4>Configuración Pago Móvil & QR Bancario (Suiche 7B / Propio)</h4>
         <div class="dos-columnas-form">
           <div>
             <label class="label-admin">Código y Nombre Banco:</label>
@@ -459,13 +476,20 @@
           </div>
           <div>
             <label class="label-admin">Cédula / RIF Comercio:</label>
-            <input type="text" id="adm-pm-rif" class="input-form-admin" placeholder="J123456789 o V12345678">
+            <input type="text" id="adm-pm-rif" class="input-form-admin" placeholder="V30629336">
           </div>
         </div>
         <div class="fila-input-boton">
-          <input type="text" id="adm-pm-tel" class="input-form-admin" placeholder="Teléfono (Ej: 04121234567)">
-          <button class="btn-action btn-primario" id="btn-guardar-pm" type="button">Guardar Datos QR</button>
+          <input type="text" id="adm-pm-tel" class="input-form-admin" placeholder="Teléfono (Ej: 04123167126)">
+          <button class="btn-action btn-primario" id="btn-guardar-pm" type="button">Guardar Datos</button>
         </div>
+
+        <label class="label-admin" style="margin-top:8px;">Opcional: Subir imagen QR descargada directo de tu Banco:</label>
+        <div class="fila-input-boton">
+          <button type="button" class="btn-action btn-secundario" id="btn-subir-qr-banco">Subir Imagen QR del Banco</button>
+          <button type="button" class="btn-action btn-naranja" id="btn-usar-qr-motor">Usar Motor Suiche 7B Automático</button>
+        </div>
+        <input type="file" id="input-file-qr-banco" accept="image/*" style="display:none;">
       </div>
 
       <!-- Configuración Tasa BCV y Logo -->
@@ -486,7 +510,7 @@
       <!-- Formulario Crear Producto (Híbrido: Peso o Unidad) -->
       <div class="bloque-admin">
         <h4>Registrar Nuevo Producto</h4>
-        <input type="text" id="adm-nombre" class="input-form-admin" placeholder="Nombre del producto (ej. Fresa de Montaña)">
+        <input type="text" id="adm-nombre" class="input-form-admin" placeholder="Nombre del producto (ej. Casabe / Fresa)">
         
         <div class="dos-columnas-form">
           <div>
@@ -497,6 +521,7 @@
               <option value="Manicería">Manicería</option>
               <option value="Granos">Granos</option>
               <option value="Charcutería">Charcutería</option>
+              <option value="Varios / Empaques">Varios / Empaques (Unidades)</option>
             </select>
           </div>
           <div>
@@ -584,6 +609,7 @@
             <option value="Manicería">Manicería</option>
             <option value="Granos">Granos</option>
             <option value="Charcutería">Charcutería</option>
+            <option value="Varios / Empaques">Varios / Empaques (Unidades)</option>
           </select>
         </div>
         <div>
