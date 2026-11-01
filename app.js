@@ -114,6 +114,36 @@ function escaparHTML(str) {
   );
 }
 
+// ==========================================================
+// NORMALIZADORES BANCARIOS (SOPORTE COMAS BDV Y MACRODROID)
+// ==========================================================
+function parsearMontoVenezolano(valorRaw) {
+  if (typeof valorRaw === 'number') return valorRaw;
+  if (!valorRaw) return 0;
+  let str = String(valorRaw).trim().replace(/[^\d.,]/g, '');
+  if (!str) return 0;
+
+  // Si tiene punto de mil y coma decimal (ej: "1.266,78" -> "1266.78")
+  if (str.includes('.') && str.includes(',')) {
+    if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
+      str = str.replace(/\./g, '').replace(',', '.');
+    } else {
+      str = str.replace(/,/g, '');
+    }
+  } else if (str.includes(',')) {
+    // Si viene directo del BDV como "266,78" -> "266.78"
+    str = str.replace(',', '.');
+  }
+  const num = parseFloat(str);
+  return isNaN(num) ? 0 : num;
+}
+
+function extraerUltimos6Digitos(refRaw) {
+  if (!refRaw) return "";
+  const soloDigitos = String(refRaw).replace(/\D/g, '');
+  return soloDigitos.slice(-6);
+}
+
 // Cifrado SHA-256 para PIN Administrador
 async function calcularHashSHA256(mensaje) {
   const msgBuffer = new TextEncoder().encode(mensaje);
@@ -151,7 +181,7 @@ function mostrarToast(mensaje, tipo = 'exito') {
   }, 3200);
 }
 
-// Precarga inteligente de imágenes 3D en segundo plano para respuesta instantánea
+// Precarga inteligente de imágenes 3D en segundo plano
 function precargarImagenes3D() {
   Object.values(iconosCategorias3D).forEach(url => {
     const img = new Image();
@@ -183,7 +213,6 @@ function comprimirImagenPNGTransparente(file, callback) {
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
-      // Exportar como PNG para mantener el fondo transparente 3D
       const dataUrl = canvas.toDataURL('image/png');
       callback(dataUrl);
     };
@@ -192,7 +221,7 @@ function comprimirImagenPNGTransparente(file, callback) {
   reader.readAsDataURL(file);
 }
 
-// Procesador de la imagen oficial del Código QR de tu celular (Alta Nitidez)
+// Procesador de la imagen oficial del Código QR de tu celular
 function procesarSubidaQRBanco(file) {
   if (!file) return;
   const reader = new FileReader();
@@ -238,7 +267,7 @@ function actualizarVisorQRCarrito() {
   }
 }
 
-// Generador nativo de Código de Barras Vectorial SVG para el Ticket (Cero librerías)
+// Generador nativo de Código de Barras Vectorial SVG para el Ticket
 function dibujarBarcodeSVGTicket(serialTexto) {
   const svg = document.getElementById('svg-ticket-barcode');
   if (!svg) return;
@@ -332,7 +361,6 @@ document.addEventListener('DOMContentLoaded', () => {
   actualizarReporteAdmin();
   document.getElementById('adm-fecha-ingreso').value = hoyStr;
 
-  // Levitación 3D suave en pantalla de inicio con Anime.js
   anime({
     targets: '#img-logo-bienvenida',
     translateY: [-8, 8],
@@ -571,7 +599,6 @@ function renderizarTarjetasCategorias3D() {
     const img3D = iconosCategorias3D[cat] || iconosCategoriasDefault[cat];
     const cantItems = productos.filter(p => p.categoria === cat).length;
 
-    // 1. Tarjeta Grande 3D en Pantalla Principal
     const card = document.createElement('div');
     card.className = 'card-categoria';
     card.innerHTML = `
@@ -582,7 +609,6 @@ function renderizarTarjetasCategorias3D() {
     card.addEventListener('click', () => filtrarPorCategoria(cat));
     gridCats.appendChild(card);
 
-    // 2. Píldora Rápida 3D en Barra Superior
     const pill = document.createElement('button');
     pill.type = 'button';
     pill.className = `quick-cat-pill ${categoriaSeleccionada === cat ? 'active' : ''}`;
@@ -1135,7 +1161,7 @@ function eliminarDelCarrito(index) {
   abrirCarrito();
 }
 
-// Escucha Automática en Tiempo Real con Firestore onSnapshot
+// Escucha Automática en Tiempo Real con Firestore onSnapshot (Soporta formato coma de BDV)
 function iniciarEscuchaPagosEnVivo() {
   if (unsubscribePagosVivo) {
     unsubscribePagosVivo();
@@ -1152,7 +1178,7 @@ function iniciarEscuchaPagosEnVivo() {
       if (change.type === "added" || change.type === "modified") {
         const docSnap = change.doc;
         const data = docSnap.data();
-        const montoPago = parseFloat(data.monto || data.monto_bs || 0);
+        const montoPago = parsearMontoVenezolano(data.monto || data.monto_bs || 0);
 
         if (montoPago > 0 && Math.abs(montoPago - totalBsRequerido) <= 1.50) {
           if (unsubscribePagosVivo) { unsubscribePagosVivo(); unsubscribePagosVivo = null; }
@@ -1161,7 +1187,7 @@ function iniciarEscuchaPagosEnVivo() {
             fecha_procesado: new Date().toISOString()
           });
           reproducirSonido('scan');
-          mostrarToast("¡Pago Móvil detectado automáticamente!", "exito");
+          mostrarToast("¡Pago Móvil BDV detectado automáticamente!", "exito");
           cerrarModal('modal-carrito');
           generarTicket('PAGADO');
         }
@@ -1170,7 +1196,7 @@ function iniciarEscuchaPagosEnVivo() {
   }, () => {});
 }
 
-// Verificación Manual por 6 Dígitos de Referencia
+// Verificación Manual por 6 Dígitos de Referencia (Soporta comas y texto extra de MacroDroid)
 async function validarPagoFirestore() {
   const rawInput = document.getElementById('ref-pago-input').value.trim();
   const msgDiv = document.getElementById('msg-autopago');
@@ -1188,7 +1214,7 @@ async function validarPagoFirestore() {
   }
 
   let totalBsRequerido = window.carrito.reduce((acc, item) => acc + item.subtotalBs, 0);
-  const refInput = rawInput.slice(-6);
+  const refInput = extraerUltimos6Digitos(rawInput);
 
   btnValidar.disabled = true;
   msgDiv.className = "msg-cargando";
@@ -1208,7 +1234,7 @@ async function validarPagoFirestore() {
           break;
         }
 
-        let montoRegistrado = parseFloat(data.monto || data.monto_bs || 0);
+        let montoRegistrado = parsearMontoVenezolano(data.monto || data.monto_bs || 0);
         if (montoRegistrado > 0 && Math.abs(montoRegistrado - totalBsRequerido) > 1.50) {
           msgDiv.className = "msg-error";
           msgDiv.innerText = `Monto diferente. Recibido: Bs. ${montoRegistrado.toFixed(2)} | Requerido: Bs. ${totalBsRequerido.toFixed(2)}`;
@@ -1232,11 +1258,11 @@ async function validarPagoFirestore() {
       }
     } else {
       msgDiv.className = "msg-error";
-      msgDiv.innerText = "Referencia aún no recibida. Verifique los dígitos.";
+      msgDiv.innerText = "Referencia aún no recibida. Verifique los 6 dígitos.";
     }
   } catch (error) {
     msgDiv.className = "msg-error";
-    msgDiv.innerText = "Error de red al verificar con el banco.";
+    msgDiv.innerText = "Error de red al verificar con la base de datos.";
   } finally {
     btnValidar.disabled = false;
   }
