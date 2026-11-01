@@ -2,7 +2,7 @@
    SW.JS - SERVICE WORKER V2 (SOPORTE OFFLINE + MOTOR QR SUICHE 7B)
    ========================================================== */
 
-const CACHE_NAME = 'bascula-pos-pro-cache-v4';
+const CACHE_NAME = 'bascula-pos-pro-cache-v5';
 
 // Recursos estáticos esenciales (incluye Anime.js, Lodash, D3.js y Motor QR)
 const ASSETS_TO_CACHE = [
