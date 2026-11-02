@@ -2,7 +2,7 @@
    SW.JS - SERVICE WORKER V3 (SOPORTE OFFLINE + CATÁLOGO 3D)
    ========================================================== */
 
-const CACHE_NAME = 'bascula-pos-pro-cache-v8';
+const CACHE_NAME = 'bascula-pos-pro-cache-v9';
 
 const ASSETS_TO_CACHE = [
   './',
