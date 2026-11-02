@@ -125,21 +125,28 @@ function escaparHTML(str) {
 }
 
 // ==========================================================
-// 7. MOTOR DE ACTUALIZACIÓN RÁPIDA TASA DÓLAR BCV
+// 7. MOTOR DE ACTUALIZACIÓN RÁPIDA TASA DÓLAR BCV (BLINDADO)
 // ==========================================================
 async function obtenerTasaBCV() {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000); // Límite de 3 segundos para evitar bloqueos en 4G
+
   try {
-    // 1. Intenta con la API principal (DolarVzla)
-    const res = await fetch('https://rates.dolarvzla.com/bcv/current.json', { cache: 'no-store' });
+    const res = await fetch('https://rates.dolarvzla.com/bcv/current.json', { cache: 'no-store', signal: controller.signal });
+    clearTimeout(timeoutId);
     const data = await res.json();
     if (data && data.current && data.current.usd) {
       return parseFloat(data.current.usd);
     }
-  } catch (e) {}
+  } catch (e) {
+    clearTimeout(timeoutId);
+  }
 
   try {
-    // 2. Si falla, usa el respaldo (DolarApi Oficial)
-    const res2 = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { cache: 'no-store' });
+    const controller2 = new AbortController();
+    const timeoutId2 = setTimeout(() => controller2.abort(), 3000);
+    const res2 = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { cache: 'no-store', signal: controller2.signal });
+    clearTimeout(timeoutId2);
     const data2 = await res2.json();
     if (data2 && data2.promedio) {
       return parseFloat(data2.promedio);
@@ -149,15 +156,21 @@ async function obtenerTasaBCV() {
   return null;
 }
 
-async function sincronizarTasaBCV Ahora() {
+async function sincronizarTasaBCVAhora() {
   const btn = document.getElementById('btn-sincronizar');
   if (btn) btn.innerText = "Actualizando dólar BCV...";
+  
   const nuevaTasa = await obtenerTasaBCV();
   if (nuevaTasa && !isNaN(nuevaTasa) && nuevaTasa > 0) {
     guardarTasaEnStorage(nuevaTasa);
+  } else {
+    // Si la red falla o está lenta, aseguramos que la app use la última tasa local sin bloquearse
+    actualizarDisplaysTasa();
   }
+
   if (btn) btn.innerText = "Sincronizar Tasa BCV en Tiempo Real";
 }
+
 
 // ==========================================================
 // NORMALIZADORES BANCARIOS (SOPORTE COMAS BDV Y MACRODROID)
