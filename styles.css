@@ -29,7 +29,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-body {
+html, body {
   background: var(--bg-gradient);
   background-color: var(--bg-main);
   color: var(--text);
@@ -38,6 +38,7 @@ body {
   display: flex;
   flex-direction: column;
   user-select: none;
+  overscroll-behavior-y: none; /* Bloquea el gesto de recargar la página al deslizar hacia abajo */
 }
 
 /* ==========================================================
