@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0b131e">
-  <meta name="description" content="Terminal Kiosco Báscula POS Inteligente con Catálogo 3D, Autopago Bancario e Inventario">
-  <title>Báscula POS Pro — Autopago 3D</title>
+  <meta name="description" content="Báscula POS Inteligente con Catálogo 3D, Autopago Bancario e Impresión Térmica Automática">
+  <title>Báscula — POS 3D</title>
   
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
@@ -14,11 +14,8 @@
   <link rel="stylesheet" href="styles.css">
 
   <!-- Librerías Externas (Licencia MIT - Seguras para Producción en GitHub) -->
-  <!-- Anime.js para animaciones físicas y levitación 3D -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.2/anime.min.js" defer></script>
-  <!-- Lodash para optimización de búsqueda (debounce) y colecciones -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js" defer></script>
-  <!-- D3.js para analítica visual en el Panel Admin -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js" defer></script>
 </head>
 <body>
@@ -26,11 +23,36 @@
   <!-- CONTENEDOR DE NOTIFICACIONES FLOTANTES (TOASTS) -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
-  <!-- 1. PANTALLA DE BIENVENIDA (INICIO) -->
+  <!-- BANNER FLOTANTE DE INSTRUCCIÓN AL ENTRAR (SE QUITA AL TOCAR LA PANTALLA) -->
+  <div id="overlay-instruccion-entrada" class="instruccion-floating-overlay" style="display: none;">
+    <div class="instruccion-floating-card">
+      <div class="instruccion-icon-pulse">
+        <svg class="svg-icon-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M12 3v18"></path>
+          <path d="M5 7h14"></path>
+          <path d="M3 14l2-7 2 7a2 2 0 0 1-4 0z"></path>
+          <path d="M17 14l2-7 2 7a2 2 0 0 1-4 0z"></path>
+        </svg>
+      </div>
+      <div class="instruccion-textos">
+        <h4>¡Bienvenido!</h4>
+        <p>Coloque su producto sobre la balanza o seleccione un artículo por unidad</p>
+        <small>Toque en cualquier parte para continuar</small>
+      </div>
+      <button type="button" id="btn-cerrar-instruccion" class="btn-cerrar-icono">
+        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 1. PANTALLA DE BIENVENIDA MINIMALISTA -->
   <section id="pantalla-inicio" class="pantalla-activa">
     <div class="hero-card-inicio">
       <img id="img-logo-bienvenida" class="logo-bienvenida" src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Shopping%20Cart.png" alt="Logo Comercio">
-      <h1>Terminal de Autoservicio & Báscula</h1>
+      <h1>Báscula</h1>
       
       <div class="badge-tasa-inicio">
         <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -39,8 +61,6 @@
         </svg>
         <span>Tasa Oficial BCV: <b id="tasa-display-inicio">Cargando...</b> Bs/$</span>
       </div>
-
-      <p class="subtitulo-inicio">Coloque su producto sobre la balanza o seleccione artículos por unidad</p>
       
       <button id="btn-comenzar" class="btn-comenzar" type="button">
         <span>INICIAR COMPRA</span>
@@ -58,7 +78,7 @@
       <div class="header-logo-container">
         <img id="img-logo-header" class="header-logo" src="https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Objects/Shopping%20Cart.png" alt="Logo">
         <div>
-          <h2 class="header-titulo">BÁSCULA POS PRO</h2>
+          <h2 class="header-titulo">BÁSCULA</h2>
           <button id="btn-actualizar-tasa-header" class="tasa-ticker" type="button" title="Sincronizar tasa BCV">
             <span>BCV: <b id="tasa-display-header">--.--</b> Bs/$</span>
             <svg class="svg-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -90,22 +110,9 @@
         </div>
       </div>
 
-      <!-- Controles de Hardware y Admin -->
+      <!-- Acceso Limpio al Panel Admin (El hardware ahora vive dentro del Admin) -->
       <div class="header-actions">
-        <button id="btn-conectar-usb" class="btn-admin-header btn-hw" type="button" title="Conectar Balanza por Cable USB Serial">
-          <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-          </svg>
-          <span>USB</span>
-        </button>
-        <button id="btn-conectar-ble" class="btn-admin-header btn-hw" type="button" title="Conectar Balanza por Bluetooth BLE">
-          <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
-          </svg>
-          <span>BLE</span>
-        </button>
-        <button id="btn-acceso-admin" class="btn-admin-header" type="button" title="Panel Administrador">
+        <button id="btn-acceso-admin" class="btn-admin-header" type="button" title="Panel de Control">
           <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -125,7 +132,7 @@
               <rect x="14" y="14" width="7" height="7" rx="1"></rect>
               <rect x="3" y="14" width="7" height="7" rx="1"></rect>
             </svg>
-            <span>Inicio Categorías</span>
+            <span>Categorías</span>
           </button>
           <h2 id="titulo-seccion" class="titulo-seccion">Seleccione una Categoría</h2>
         </div>
@@ -140,10 +147,24 @@
         </div>
       </div>
 
+      <!-- CASILLA DE OFERTAS SOLO POR HOY (Visible en la pantalla principal de categorías) -->
+      <section id="seccion-ofertas-hoy" class="ofertas-hoy-container">
+        <div class="ofertas-hoy-header">
+          <div class="ofertas-titulo-badge">
+            <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+            <span>¡OFERTAS SOLO POR HOY!</span>
+          </div>
+          <small class="ofertas-sub">Precios especiales por tiempo limitado</small>
+        </div>
+        <div id="grid-ofertas-hoy" class="ofertas-hoy-scroll"></div>
+      </section>
+
       <!-- PÍLDORAS VISUALES 3D DE CAMBIO RÁPIDO (Visible al elegir productos) -->
       <div id="barra-quick-cats" class="quick-cats-bar" style="display: none;"></div>
 
-      <!-- VISTA 1: 6 CATEGORÍAS CON BOTONES VISUALES 3D SIN FONDO (Renderizado dinámico) -->
+      <!-- VISTA 1: 6 CATEGORÍAS CON BOTONES VISUALES 3D SIN FONDO -->
       <div class="grid-categorias" id="vista-categorias"></div>
 
       <!-- VISTA 2: GRID DE PRODUCTOS VISUALES 3D -->
@@ -204,17 +225,26 @@
     </div>
   </div>
 
-  <!-- MODAL 2: CARRITO, AUDITORÍA DE PESO Y AUTOPAGO CON TU IMAGEN QR BANCARIA -->
+  <!-- MODAL 2: CARRITO CON BOTÓN DE VACIAR TODO, AUDITORÍA Y AUTOPAGO -->
   <div class="modal" id="modal-carrito" role="dialog" aria-modal="true">
     <div class="modal-contenido modal-carrito-ancho text-center">
       <div class="admin-header-bar">
         <h2 class="modal-titulo">Resumen de Compra & Autopago</h2>
-        <button class="btn-cerrar-icono" type="button" data-close="modal-carrito">
-          <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
+        <div class="carrito-top-actions">
+          <button id="btn-vaciar-carrito" class="btn-vaciar-todo" type="button" title="Eliminar todos los artículos del carrito">
+            <svg class="svg-icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span>Vaciar Todo</span>
+          </button>
+          <button class="btn-cerrar-icono" type="button" data-close="modal-carrito">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
       </div>
       
       <div id="lista-carrito" class="lista-carrito-scroll"></div>
@@ -247,10 +277,9 @@
         </div>
       </div>
 
-      <!-- PANEL A: AUTOPAGO CON LA IMAGEN DE TU QR DEL CELULAR GRANDE + FIRESTORE EN VIVO -->
+      <!-- PANEL A: AUTOPAGO CON TU IMAGEN QR DEL CELULAR -->
       <div id="panel-autopago-qr" class="seccion-autopago">
         <div class="autopago-grid">
-          <!-- Columna Izquierda: Tu Imagen QR Oficial en Grande -->
           <div class="qr-bancario-card">
             <div class="qr-imagen-grande-wrapper" id="btn-ampliar-qr" title="Toca para ver el QR en pantalla gigante">
               <img id="qr-custom-img" src="" alt="Código QR Pago Móvil" class="qr-img-fija">
@@ -267,7 +296,6 @@
             <span class="qr-caption">Toca el QR para ampliarlo al máximo</span>
           </div>
 
-          <!-- Columna Derecha: Datos del Comercio con Copiado Rápido + Verificación -->
           <div class="datos-autopago-col">
             <div class="datos-comercio-box">
               <div class="dato-fila">
@@ -325,12 +353,12 @@
 
       <!-- PANEL B: PAGO EN CAJA / DIVISAS -->
       <div id="panel-pago-divisas" class="seccion-autopago" style="display:none;">
-        <p class="texto-ayuda-modal">Pagos en divisas efectivo aplican 3% de IGTF según normativa SENIAT. Emita su ticket para cancelar en caja.</p>
+        <p class="texto-ayuda-modal">Pagos en divisas efectivo aplican 3% de IGTF según normativa SENIAT. Finalice para emitir su comprobante.</p>
       </div>
 
       <div class="modal-botones-row">
         <button class="btn-action btn-secundario" type="button" data-close="modal-carrito">Seguir Comprando</button>
-        <button class="btn-action btn-primario" id="btn-ticket-pendiente" type="button">Emitir Ticket para Caja</button>
+        <button class="btn-action btn-primario" id="btn-ticket-pendiente" type="button">Finalizar y Sacar Ticket</button>
       </div>
     </div>
   </div>
@@ -349,11 +377,11 @@
     </div>
   </div>
   
-  <!-- MODAL 3: TICKET GENERADO CON CÓDIGO DE BARRAS VECTORIAL SVG -->
+  <!-- MODAL 3: TICKET DIGITAL / MODO FOTO (Y ESTADO DE IMPRESIÓN AUTOMÁTICA) -->
   <div class="modal" id="modal-ticket" role="dialog" aria-modal="true">
     <div class="modal-contenido text-center">
-      <h2 class="modal-titulo">Comprobante Digital Emitido</h2>
-      <p class="texto-ayuda-modal">Presente este comprobante en la salida o consérvelo.</p>
+      <h2 id="titulo-modal-ticket" class="modal-titulo">¡Compra Finalizada!</h2>
+      <p id="subtitulo-modal-ticket" class="texto-ayuda-modal">Su ticket se está imprimiendo automáticamente...</p>
       
       <div class="ticket-impresion" id="contenido-ticket"></div>
       <div class="barcode-auditoria-box">
@@ -367,7 +395,7 @@
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
             <rect x="6" y="14" width="12" height="8"></rect>
           </svg>
-          <span>Imprimir en Térmica (Bluetooth)</span>
+          <span>Reimprimir Copia en Papel</span>
         </button>
         <div class="modal-botones-row">
           <button class="btn-action btn-naranja" id="btn-repetir-pesaje" type="button">Seguir Comprando</button>
@@ -428,13 +456,60 @@
   <div class="modal" id="modal-admin" role="dialog" aria-modal="true">
     <div class="modal-contenido modal-admin-ancho">
       <div class="admin-header-bar">
-        <h2 class="modal-titulo">Panel de Control & Configuración POS</h2>
+        <h2 class="modal-titulo">Panel de Control & Configuración</h2>
         <button class="btn-cerrar-icono" type="button" data-close="modal-admin">
           <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
+      </div>
+
+      <!-- NUEVO BLOQUE CENTRALIZADO: HARDWARE (IMPRESORA, FORMATO PAPEL Y BALANZA) -->
+      <div class="bloque-admin bloque-hardware-destacado">
+        <h4>Hardware: Impresora Térmica, Papel & Balanza</h4>
+        
+        <label class="label-admin">1. Conexión de Balanza Digital (Bluetooth BLE o Cable USB):</label>
+        <div class="modal-botones-row" style="margin-top:4px; margin-bottom:12px;">
+          <button id="btn-conectar-ble" class="btn-action btn-secundario" type="button">
+            <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"></polyline>
+            </svg>
+            <span>Balanza Bluetooth (BLE)</span>
+          </button>
+          <button id="btn-conectar-usb" class="btn-action btn-secundario" type="button">
+            <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+            </svg>
+            <span>Balanza Cable USB</span>
+          </button>
+        </div>
+
+        <label class="label-admin">2. Impresora Térmica Bluetooth & Tamaño de Rollo:</label>
+        <div class="dos-columnas-form" style="align-items: center; margin-bottom: 10px;">
+          <button id="btn-vincular-impresora-admin" class="btn-action btn-azul-full" type="button">
+            <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 6 2 18 2 18 9"></polyline>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+              <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            <span id="lbl-estado-impresora">Conectar Impresora</span>
+          </button>
+
+          <select id="adm-papel-ancho" class="input-form-admin" style="margin-bottom:0;">
+            <option value="58">Rollo Pequeño 58mm (32 col)</option>
+            <option value="80">Rollo Grande 80mm (48 col)</option>
+          </select>
+        </div>
+
+        <div class="switch-row-admin">
+          <div>
+            <b>Sacar Ticket Impreso de una vez al Finalizar</b>
+            <small>Si te quedas sin rollo de papel, desactívalo para que el cliente le tome foto al ticket en pantalla.</small>
+          </div>
+          <input type="checkbox" id="adm-auto-print" class="checkbox-pos" checked>
+        </div>
       </div>
       
       <!-- Reporte y Gráfica D3.js -->
@@ -530,9 +605,9 @@
         </div>
       </div>
 
-      <!-- Formulario Crear Producto (Con soporte para Imágenes 3D transparentes) -->
+      <!-- Formulario Crear Producto (Con opción de Oferta Solo por Hoy) -->
       <div class="bloque-admin">
-        <h4>Registrar Nuevo Producto (Soporta PNG 3D sin fondo)</h4>
+        <h4>Registrar Nuevo Producto (Soporta PNG 3D y Ofertas de Hoy)</h4>
         <input type="text" id="adm-nombre" class="input-form-admin" placeholder="Nombre del producto (ej. Manzana Gala / Casabe)">
         
         <div class="dos-columnas-form">
@@ -573,13 +648,21 @@
             <input type="text" id="adm-codigo-barras" class="input-form-admin" placeholder="Escanea o escribe">
           </div>
           <div>
-            <label class="label-admin">Días de vida útil:</label>
-            <input type="number" id="adm-dias-vida" class="input-form-admin" value="5">
+            <label class="label-admin">% Descuento Oferta Hoy (0 = Normal):</label>
+            <input type="number" id="adm-descuento-hoy" class="input-form-admin" value="0" min="0" max="90" placeholder="Ej: 20">
           </div>
         </div>
 
-        <label class="label-admin">Fecha de Ingreso del Lote:</label>
-        <input type="date" id="adm-fecha-ingreso" class="input-form-admin">
+        <div class="dos-columnas-form">
+          <div>
+            <label class="label-admin">Días de vida útil:</label>
+            <input type="number" id="adm-dias-vida" class="input-form-admin" value="5">
+          </div>
+          <div>
+            <label class="label-admin">Fecha de Ingreso:</label>
+            <input type="date" id="adm-fecha-ingreso" class="input-form-admin">
+          </div>
+        </div>
 
         <label class="label-admin">Imagen 3D del Producto (URL de tu GitHub o Galería):</label>
         <div class="fila-input-boton">
@@ -646,7 +729,7 @@
 
       <div class="dos-columnas-form">
         <div>
-          <label class="label-admin">Precio ($):</label>
+          <label class="label-admin">Precio Base ($):</label>
           <input type="number" step="0.01" id="edit-prod-precio" class="input-form-admin">
         </div>
         <div>
@@ -661,13 +744,21 @@
           <input type="text" id="edit-prod-codigo" class="input-form-admin">
         </div>
         <div>
-          <label class="label-admin">Días de vida útil:</label>
-          <input type="number" id="edit-prod-dias" class="input-form-admin">
+          <label class="label-admin">% Descuento Oferta Hoy:</label>
+          <input type="number" id="edit-prod-descuento-hoy" class="input-form-admin" min="0" max="90">
         </div>
       </div>
 
-      <label class="label-admin">Fecha de Ingreso:</label>
-      <input type="date" id="edit-prod-fecha" class="input-form-admin">
+      <div class="dos-columnas-form">
+        <div>
+          <label class="label-admin">Días de vida útil:</label>
+          <input type="number" id="edit-prod-dias" class="input-form-admin">
+        </div>
+        <div>
+          <label class="label-admin">Fecha de Ingreso:</label>
+          <input type="date" id="edit-prod-fecha" class="input-form-admin">
+        </div>
+      </div>
 
       <label class="label-admin">Imagen 3D (URL de GitHub o Galería):</label>
       <div class="fila-input-boton">
