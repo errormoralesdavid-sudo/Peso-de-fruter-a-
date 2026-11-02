@@ -1,9 +1,9 @@
 /* ==========================================================
-   APP.JS - MOTOR SÚPER APP BÁSCULA POS 3D & VISOR QR OFICIAL
+   APP.JS - MOTOR SÚPER APP BÁSCULA POS 3D & NAVEGACIÓN NATIVA
    ========================================================== */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, query, where, getDocs, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { initializeFirestore, collection, query, where, getDocs, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAsBnDGC_E_oSoKrewTbmkrmw2JAjdcalU",
@@ -15,7 +15,10 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Long-Polling activado para evitar bloqueos de WebSockets en redes móviles 4G de Venezuela
+const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true
+});
 
 // Estado Global y Persistencia Segura
 let tasaBCV = parseFloat(localStorage.getItem('bascula_tasa_bcv')) || 36.50;
@@ -33,7 +36,10 @@ let datosPagoMovil = JSON.parse(localStorage.getItem('bascula_datos_pm')) || {
 // Imagen fija de tu Código QR Bancario (URL de GitHub o Base64 subida desde tu celular)
 let qrBancoImagenSrc = localStorage.getItem('bascula_qr_custom_img') || "";
 
-// Iconos 3D sin fondo para las 6 Categorías (Personalizables desde el Panel Admin con links de tu GitHub)
+// Lista local de seguridad para referencias ya procesadas
+let referenciasQuemadasLocal = JSON.parse(localStorage.getItem('bascula_refs_quemadas')) || [];
+
+// Iconos 3D sin fondo para las 6 Categorías
 const FLUENT_3D_BASE = "https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis";
 const iconosCategoriasDefault = {
   "Frutería": `${FLUENT_3D_BASE}/Food/Red%20Apple.png`,
@@ -63,6 +69,7 @@ let temporizadorInactividad = null;
 let datosUltimoTicket = null;
 let ventasHistorial = JSON.parse(localStorage.getItem('bascula_ventas_historial')) || [];
 let imagenesBase64Temp = { add: null, edit: null };
+let navegandoConBotonAtras = false;
 const hoyStr = new Date().toISOString().split('T')[0];
 
 // Catálogo Predeterminado con Imágenes 3D Sin Fondo (.PNG transparentes)
@@ -123,7 +130,6 @@ function parsearMontoVenezolano(valorRaw) {
   let str = String(valorRaw).trim().replace(/[^\d.,]/g, '');
   if (!str) return 0;
 
-  // Si tiene punto de mil y coma decimal (ej: "1.266,78" -> "1266.78")
   if (str.includes('.') && str.includes(',')) {
     if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
       str = str.replace(/\./g, '').replace(',', '.');
@@ -131,7 +137,6 @@ function parsearMontoVenezolano(valorRaw) {
       str = str.replace(/,/g, '');
     }
   } else if (str.includes(',')) {
-    // Si viene directo del BDV como "266,78" -> "266.78"
     str = str.replace(',', '.');
   }
   const num = parseFloat(str);
@@ -142,6 +147,63 @@ function extraerUltimos6Digitos(refRaw) {
   if (!refRaw) return "";
   const soloDigitos = String(refRaw).replace(/\D/g, '');
   return soloDigitos.slice(-6);
+}
+
+// ==========================================================
+// NAVEGACIÓN NATIVA CON BOTÓN / GESTO "ATRÁS" DEL CELULAR
+// ==========================================================
+function empujarEstadoHistorial(vistaObj) {
+  if (navegandoConBotonAtras) return;
+  try {
+    window.history.pushState(vistaObj, "");
+  } catch (e) {}
+}
+
+function inicializarBotonAtrasNativo() {
+  try {
+    window.history.replaceState({ vista: 'inicio' }, "");
+  } catch (e) {}
+
+  window.addEventListener('popstate', () => {
+    navegandoConBotonAtras = true;
+
+    // 1. Prioridad: Si hay algún modal abierto (Numpad, Carrito, Confirmar, Admin, etc.), cerrarlo
+    const modalesAbiertos = Array.from(document.querySelectorAll('.modal.show'));
+    if (modalesAbiertos.length > 0) {
+      const ultimoModal = modalesAbiertos[modalesAbiertos.length - 1];
+      if (ultimoModal.id === 'modal-carrito' && unsubscribePagosVivo) {
+        unsubscribePagosVivo();
+        unsubscribePagosVivo = null;
+      }
+      cerrarModal(ultimoModal.id, true);
+      navegandoConBotonAtras = false;
+      return;
+    }
+
+    // 2. Si está dentro de una Categoría o buscando productos, volver a la vista de 6 Categorías
+    const vistaProductos = document.getElementById('vista-productos');
+    if (vistaProductos && vistaProductos.style.display !== 'none') {
+      mostrarCategorias(true);
+      navegandoConBotonAtras = false;
+      return;
+    }
+
+    // 3. Si está en la pantalla de Categorías del Kiosco
+    const pantallaKiosco = document.getElementById('pantalla-kiosco');
+    if (pantallaKiosco && pantallaKiosco.style.display !== 'none') {
+      if (window.carrito.length > 0) {
+        // Si tiene productos en el carrito, protegemos su compra para que no salga por accidente
+        mostrarToast("Tienes productos en el carrito. Usa el botón de salir al finalizar.", "aviso");
+        try { window.history.pushState({ vista: 'categorias' }, ""); } catch (e) {}
+      } else {
+        reiniciarTodo(true);
+      }
+      navegandoConBotonAtras = false;
+      return;
+    }
+
+    navegandoConBotonAtras = false;
+  });
 }
 
 // Cifrado SHA-256 para PIN Administrador
@@ -358,6 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
   precargarImagenes3D();
   obtenerTasaBCVOnline();
   iniciarMonitoreoInactividad();
+  inicializarBotonAtrasNativo();
   actualizarReporteAdmin();
   document.getElementById('adm-fecha-ingreso').value = hoyStr;
 
@@ -378,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
     abrirModal('modal-peso-sim');
   });
   document.getElementById('btn-tara').addEventListener('click', aplicarTara);
-  document.getElementById('btn-volver').addEventListener('click', mostrarCategorias);
+  document.getElementById('btn-volver').addEventListener('click', () => mostrarCategorias(false));
   document.getElementById('btn-cart-float').addEventListener('click', abrirCarrito);
 
   // Acceso Admin con Numpad Táctil
@@ -479,7 +542,6 @@ document.addEventListener('DOMContentLoaded', () => {
     abrirModal('modal-qr-fullscreen');
   });
 
-  // Copiar monto y datos bancarios al portapapeles
   document.getElementById('btn-copiar-monto').addEventListener('click', () => {
     const montoTxt = document.getElementById('cart-total-bs').innerText;
     navigator.clipboard.writeText(montoTxt).then(() => mostrarToast(`Monto Bs. ${montoTxt} copiado`, "exito"));
@@ -512,11 +574,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Ticket y Exportaciones
   document.getElementById('btn-imprimir-bt').addEventListener('click', imprimirTicketBluetooth);
   document.getElementById('btn-repetir-pesaje').addEventListener('click', repetirPesaje);
-  document.getElementById('btn-finalizar-salir').addEventListener('click', reiniciarTodo);
+  document.getElementById('btn-finalizar-salir').addEventListener('click', () => reiniciarTodo(false));
   document.getElementById('btn-exportar-ventas').addEventListener('click', exportarVentasCSV);
   document.getElementById('btn-exportar-catalogo').addEventListener('click', exportarProductosCSV);
 
-  // Galería Productos (Preserva PNG transparente)
+  // Galería Productos
   document.getElementById('btn-galeria-add').addEventListener('click', () => document.getElementById('img-gallery-add').click());
   document.getElementById('img-gallery-add').addEventListener('change', (e) => {
     comprimirImagenPNGTransparente(e.target.files[0], (dataUrl) => {
@@ -569,7 +631,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Atajos de teclado
+  // Atajos de teclado físico
   window.addEventListener('keydown', (e) => {
     if (e.key === 'F4') {
       e.preventDefault();
@@ -710,9 +772,13 @@ function guardarDatosPagoMovil() {
 function abrirModal(id) {
   const el = document.getElementById(id);
   if (!el) return;
+  const yaAbierto = el.classList.contains('show');
   el.style.display = 'flex';
   requestAnimationFrame(() => {
     el.classList.add('show');
+    if (!yaAbierto) {
+      empujarEstadoHistorial({ modal: id });
+    }
     anime({
       targets: `#${id} .modal-contenido`,
       scale: [0.88, 1],
@@ -725,7 +791,7 @@ function abrirModal(id) {
 
 function cerrarModal(id) {
   const el = document.getElementById(id);
-  if (!el) return;
+  if (!el || !el.classList.contains('show')) return;
   anime({
     targets: `#${id} .modal-contenido`,
     scale: [1, 0.92],
@@ -804,7 +870,7 @@ function resetearTemporizador() {
   clearTimeout(temporizadorInactividad);
   temporizadorInactividad = setTimeout(() => {
     if (document.getElementById('pantalla-kiosco').style.display === 'flex' && window.carrito.length === 0) {
-      reiniciarTodo();
+      reiniciarTodo(false);
     }
   }, 120000);
 }
@@ -813,6 +879,7 @@ function resetearTemporizador() {
 // CATÁLOGO Y COMPRA HÍBRIDA CON ESCENARIO 3D
 // ==========================================================
 function iniciarKiosco() {
+  empujarEstadoHistorial({ vista: 'categorias' });
   anime({
     targets: '#pantalla-inicio',
     opacity: [1, 0],
@@ -824,12 +891,15 @@ function iniciarKiosco() {
       const kiosco = document.getElementById('pantalla-kiosco');
       kiosco.style.display = 'flex';
       anime({ targets: kiosco, opacity: [0, 1], duration: 380, easing: 'easeOutQuad' });
-      mostrarCategorias();
+      mostrarCategorias(true);
     }
   });
 }
 
-function mostrarCategorias() {
+function mostrarCategorias(desdeHistorial = false) {
+  if (!desdeHistorial && categoriaSeleccionada !== "") {
+    empujarEstadoHistorial({ vista: 'categorias' });
+  }
   categoriaSeleccionada = "";
   document.getElementById('input-buscar').value = "";
   document.getElementById('titulo-seccion').innerText = "Seleccione una Categoría";
@@ -851,6 +921,9 @@ function mostrarCategorias() {
 }
 
 function filtrarPorCategoria(cat) {
+  if (categoriaSeleccionada !== cat) {
+    empujarEstadoHistorial({ vista: 'productos', categoria: cat });
+  }
   categoriaSeleccionada = cat;
   document.getElementById('input-buscar').value = "";
   document.getElementById('titulo-seccion').innerText = cat;
@@ -866,6 +939,9 @@ function filtrarPorCategoria(cat) {
 function buscarProductosDirecto() {
   let texto = document.getElementById('input-buscar').value.toLowerCase().trim();
   if (texto.length > 0) {
+    if (document.getElementById('vista-productos').style.display === 'none') {
+      empujarEstadoHistorial({ vista: 'busqueda' });
+    }
     document.getElementById('vista-categorias').style.display = 'none';
     document.getElementById('barra-quick-cats').style.display = 'flex';
     document.getElementById('vista-productos').style.display = 'grid';
@@ -883,7 +959,7 @@ function buscarProductosDirecto() {
   } else if (categoriaSeleccionada) {
     filtrarPorCategoria(categoriaSeleccionada);
   } else {
-    mostrarCategorias();
+    mostrarCategorias(true);
   }
 }
 
@@ -1091,7 +1167,7 @@ function actualizarCarritoBadge() {
 }
 
 // ==========================================================
-// CARRITO, AUDITORÍA DE PESO, VISOR QR Y ESCUCHA EN VIVO
+// CARRITO, QUEMADO COMPATIBLE CON JUNRIDE RULES Y ESCUCHA EN VIVO
 // ==========================================================
 function cambiarMetodoPago(metodo) {
   metodoPagoActual = metodo;
@@ -1161,7 +1237,45 @@ function eliminarDelCarrito(index) {
   abrirCarrito();
 }
 
-// Escucha Automática en Tiempo Real con Firestore onSnapshot (Soporta formato coma de BDV)
+// Función blindada para marcar el pago como usado cumpliendo las Reglas de Seguridad de tu Firestore
+async function quemarPagoEnFirestore(docSnap) {
+  const docId = docSnap.id;
+  if (!referenciasQuemadasLocal.includes(docId)) {
+    referenciasQuemadasLocal.push(docId);
+    localStorage.setItem('bascula_refs_quemadas', JSON.stringify(referenciasQuemadasLocal));
+  }
+
+  try {
+    // Enviamos canjeado_en_junride: true porque tu regla en Firestore exige ese campo exacto para permitir update
+    await updateDoc(docSnap.ref, {
+      canjeado_en_junride: true,
+      estado: "PROCESADO",
+      fecha_procesado: new Date().toISOString()
+    });
+  } catch (errSdk) {
+    // Respaldo por API REST directa en caso de inestabilidad 4G
+    try {
+      const data = docSnap.data();
+      const restUrl = `https://firestore.googleapis.com/v1/projects/geomercado-9d642/databases/(default)/documents/verificacion_pagos/${docId}?updateMask.fieldPaths=canjeado_en_junride&updateMask.fieldPaths=estado&updateMask.fieldPaths=monto&updateMask.fieldPaths=referencia_6digitos`;
+      await fetch(restUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: {
+            canjeado_en_junride: { booleanValue: true },
+            estado: { stringValue: "PROCESADO" },
+            monto: { stringValue: String(data.monto || "") },
+            referencia_6digitos: { stringValue: String(data.referencia_6digitos || "") }
+          }
+        })
+      });
+    } catch (errRest) {
+      console.warn("Quemado registrado localmente.");
+    }
+  }
+}
+
+// Escucha Automática en Tiempo Real con Firestore onSnapshot
 function iniciarEscuchaPagosEnVivo() {
   if (unsubscribePagosVivo) {
     unsubscribePagosVivo();
@@ -1178,14 +1292,15 @@ function iniciarEscuchaPagosEnVivo() {
       if (change.type === "added" || change.type === "modified") {
         const docSnap = change.doc;
         const data = docSnap.data();
-        const montoPago = parsearMontoVenezolano(data.monto || data.monto_bs || 0);
 
+        if (data.canjeado_en_junride === true || data.estado === "PROCESADO" || referenciasQuemadasLocal.includes(docSnap.id)) {
+          return;
+        }
+
+        const montoPago = parsearMontoVenezolano(data.monto || data.monto_bs || 0);
         if (montoPago > 0 && Math.abs(montoPago - totalBsRequerido) <= 1.50) {
           if (unsubscribePagosVivo) { unsubscribePagosVivo(); unsubscribePagosVivo = null; }
-          await updateDoc(docSnap.ref, {
-            estado: "PROCESADO",
-            fecha_procesado: new Date().toISOString()
-          });
+          await quemarPagoEnFirestore(docSnap);
           reproducirSonido('scan');
           mostrarToast("¡Pago Móvil BDV detectado automáticamente!", "exito");
           cerrarModal('modal-carrito');
@@ -1196,7 +1311,7 @@ function iniciarEscuchaPagosEnVivo() {
   }, () => {});
 }
 
-// Verificación Manual por 6 Dígitos de Referencia (Soporta comas y texto extra de MacroDroid)
+// Verificación Manual por 6 Dígitos de Referencia
 async function validarPagoFirestore() {
   const rawInput = document.getElementById('ref-pago-input').value.trim();
   const msgDiv = document.getElementById('msg-autopago');
@@ -1228,10 +1343,11 @@ async function validarPagoFirestore() {
     if (!querySnapshot.empty) {
       for (const docSnap of querySnapshot.docs) {
         const data = docSnap.data();
-        if (data.estado === "PROCESADO") {
+
+        if (data.estado === "PROCESADO" || data.canjeado_en_junride === true || referenciasQuemadasLocal.includes(docSnap.id)) {
           msgDiv.className = "msg-error";
           msgDiv.innerText = "Esta referencia ya fue utilizada anteriormente.";
-          break;
+          continue;
         }
 
         let montoRegistrado = parsearMontoVenezolano(data.monto || data.monto_bs || 0);
@@ -1241,10 +1357,8 @@ async function validarPagoFirestore() {
           break;
         }
 
-        await updateDoc(docSnap.ref, {
-          estado: "PROCESADO",
-          fecha_procesado: new Date().toISOString()
-        });
+        // Quemar pago cumpliendo la regla canjeado_en_junride == true
+        await quemarPagoEnFirestore(docSnap);
 
         msgDiv.className = "msg-exito";
         msgDiv.innerText = "¡Pago Confirmado Exitosamente!";
@@ -1253,8 +1367,8 @@ async function validarPagoFirestore() {
         setTimeout(() => {
           cerrarModal('modal-carrito');
           generarTicket('PAGADO');
-        }, 900);
-        break;
+        }, 700);
+        return;
       }
     } else {
       msgDiv.className = "msg-error";
@@ -1262,7 +1376,7 @@ async function validarPagoFirestore() {
     }
   } catch (error) {
     msgDiv.className = "msg-error";
-    msgDiv.innerText = "Error de red al verificar con la base de datos.";
+    msgDiv.innerText = "Error de conexión al consultar la referencia.";
   } finally {
     btnValidar.disabled = false;
   }
@@ -1436,7 +1550,7 @@ async function imprimirTicketBluetooth() {
 
 function repetirPesaje() { cerrarModal('modal-ticket'); }
 
-function reiniciarTodo() {
+function reiniciarTodo(desdeHistorial = false) {
   if (unsubscribePagosVivo) { unsubscribePagosVivo(); unsubscribePagosVivo = null; }
   window.carrito = []; taraGramos = 0; datosUltimoTicket = null;
   actualizarCarritoBadge();
@@ -1444,11 +1558,14 @@ function reiniciarTodo() {
     m.classList.remove('show');
     m.style.display = 'none';
   });
-  mostrarCategorias();
+  mostrarCategorias(true);
   
   document.getElementById('pantalla-kiosco').style.display = 'none';
   const inicio = document.getElementById('pantalla-inicio');
   inicio.style.display = 'flex';
+  if (!desdeHistorial) {
+    try { window.history.replaceState({ vista: 'inicio' }, ""); } catch (e) {}
+  }
   anime({ targets: inicio, opacity: [0, 1], duration: 400, easing: 'easeOutQuad' });
 }
 
