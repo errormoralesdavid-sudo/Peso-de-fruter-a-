@@ -1,5 +1,5 @@
 /* ==========================================================
-   APP.JS - MOTOR SÚPER APP BÁSCULA POS 3D & NAVEGACIÓN NATIVA
+   APP.JS - MOTOR SÚPER APP BÁSCULA POS 3D, OFERTAS & HARDWARE
    ========================================================== */
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -15,7 +15,6 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-// Long-Polling activado para evitar bloqueos de WebSockets en redes móviles 4G de Venezuela
 const db = initializeFirestore(app, {
   experimentalForceLongPolling: true
 });
@@ -33,10 +32,14 @@ let datosPagoMovil = JSON.parse(localStorage.getItem('bascula_datos_pm')) || {
   telefono: "04123167126"
 };
 
-// Imagen fija de tu Código QR Bancario (URL de GitHub o Base64 subida desde tu celular)
-let qrBancoImagenSrc = localStorage.getItem('bascula_qr_custom_img') || "";
+// Configuración de Impresora Térmica y Rollo de Papel
+let anchoPapelMM = localStorage.getItem('bascula_papel_ancho') || "58"; // "58" (32 col) o "80" (48 col)
+let autoImprimirTicket = localStorage.getItem('bascula_auto_print') !== "false"; // true por defecto
+let characteristicImpresoraActiva = null;
+let nombreImpresoraActiva = "";
 
-// Lista local de seguridad para referencias ya procesadas
+// Imagen fija de tu Código QR Bancario
+let qrBancoImagenSrc = localStorage.getItem('bascula_qr_custom_img') || "";
 let referenciasQuemadasLocal = JSON.parse(localStorage.getItem('bascula_refs_quemadas')) || [];
 
 // Iconos 3D sin fondo para las 6 Categorías
@@ -72,19 +75,19 @@ let imagenesBase64Temp = { add: null, edit: null };
 let navegandoConBotonAtras = false;
 const hoyStr = new Date().toISOString().split('T')[0];
 
-// Catálogo Predeterminado con Imágenes 3D Sin Fondo (.PNG transparentes)
+// Catálogo Predeterminado (Con ejemplos de Ofertas Solo por Hoy activas)
 const productosPredeterminados = [
-  { id: 1, nombre: 'Manzana Roja 3D', categoria: 'Frutería', tipoVenta: 'peso', precioKg: 2.50, stockGramos: 15000, codigoBarras: '7591001', diasVida: 7, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Red%20Apple.png` },
-  { id: 2, nombre: 'Cambur / Banana', categoria: 'Frutería', tipoVenta: 'peso', precioKg: 1.20, stockGramos: 8000, codigoBarras: '7591002', diasVida: 4, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Banana.png` },
-  { id: 3, nombre: 'Fresa de Montaña', categoria: 'Frutería', tipoVenta: 'peso', precioKg: 3.80, stockGramos: 6000, codigoBarras: '7591010', diasVida: 3, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Strawberry.png` },
-  { id: 4, nombre: 'Zanahoria Fresca', categoria: 'Verdulería', tipoVenta: 'peso', precioKg: 1.80, stockGramos: 20000, codigoBarras: '7591003', diasVida: 8, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Carrot.png` },
-  { id: 5, nombre: 'Tomate Perita', categoria: 'Verdulería', tipoVenta: 'peso', precioKg: 3.00, stockGramos: 12000, codigoBarras: '7591004', diasVida: 4, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Tomato.png` },
-  { id: 6, nombre: 'Aguacate Criollo', categoria: 'Verdulería', tipoVenta: 'peso', precioKg: 3.20, stockGramos: 9000, codigoBarras: '7591011', diasVida: 5, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Avocado.png` },
-  { id: 7, nombre: 'Maní Tostado 250g', categoria: 'Manicería', tipoVenta: 'unidad', precioKg: 1.50, stockGramos: 40, codigoBarras: '7591005', diasVida: 45, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Peanuts.png` },
-  { id: 8, nombre: 'Caraotas Negras', categoria: 'Granos', tipoVenta: 'peso', precioKg: 2.20, stockGramos: 30000, codigoBarras: '7591006', diasVida: 60, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Beans.png` },
-  { id: 9, nombre: 'Queso Paisa', categoria: 'Charcutería', tipoVenta: 'peso', precioKg: 6.50, stockGramos: 6000, codigoBarras: '7591007', diasVida: 10, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Cheese%20Wedge.png` },
-  { id: 10, nombre: 'Pan / Casabe Empaque', categoria: 'Varios / Empaques', tipoVenta: 'unidad', precioKg: 2.00, stockGramos: 30, codigoBarras: '7591008', diasVida: 60, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Flatbread.png` },
-  { id: 11, nombre: 'Medio Cartón Huevos', categoria: 'Varios / Empaques', tipoVenta: 'unidad', precioKg: 2.80, stockGramos: 25, codigoBarras: '7591009', diasVida: 15, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Egg.png` }
+  { id: 1, nombre: 'Manzana Roja 3D', categoria: 'Frutería', tipoVenta: 'peso', precioKg: 2.50, stockGramos: 15000, codigoBarras: '7591001', descuentoHoy: 15, diasVida: 7, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Red%20Apple.png` },
+  { id: 2, nombre: 'Cambur / Banana', categoria: 'Frutería', tipoVenta: 'peso', precioKg: 1.20, stockGramos: 8000, codigoBarras: '7591002', descuentoHoy: 20, diasVida: 4, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Banana.png` },
+  { id: 3, nombre: 'Fresa de Montaña', categoria: 'Frutería', tipoVenta: 'peso', precioKg: 3.80, stockGramos: 6000, codigoBarras: '7591010', descuentoHoy: 0, diasVida: 3, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Strawberry.png` },
+  { id: 4, nombre: 'Zanahoria Fresca', categoria: 'Verdulería', tipoVenta: 'peso', precioKg: 1.80, stockGramos: 20000, codigoBarras: '7591003', descuentoHoy: 0, diasVida: 8, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Carrot.png` },
+  { id: 5, nombre: 'Tomate Perita', categoria: 'Verdulería', tipoVenta: 'peso', precioKg: 3.00, stockGramos: 12000, codigoBarras: '7591004', descuentoHoy: 25, diasVida: 4, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Tomato.png` },
+  { id: 6, nombre: 'Aguacate Criollo', categoria: 'Verdulería', tipoVenta: 'peso', precioKg: 3.20, stockGramos: 9000, codigoBarras: '7591011', descuentoHoy: 0, diasVida: 5, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Avocado.png` },
+  { id: 7, nombre: 'Maní Tostado 250g', categoria: 'Manicería', tipoVenta: 'unidad', precioKg: 1.50, stockGramos: 40, codigoBarras: '7591005', descuentoHoy: 0, diasVida: 45, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Peanuts.png` },
+  { id: 8, nombre: 'Caraotas Negras', categoria: 'Granos', tipoVenta: 'peso', precioKg: 2.20, stockGramos: 30000, codigoBarras: '7591006', descuentoHoy: 0, diasVida: 60, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Beans.png` },
+  { id: 9, nombre: 'Queso Paisa', categoria: 'Charcutería', tipoVenta: 'peso', precioKg: 6.50, stockGramos: 6000, codigoBarras: '7591007', descuentoHoy: 10, diasVida: 10, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Cheese%20Wedge.png` },
+  { id: 10, nombre: 'Pan / Casabe Empaque', categoria: 'Varios / Empaques', tipoVenta: 'unidad', precioKg: 2.00, stockGramos: 30, codigoBarras: '7591008', descuentoHoy: 0, diasVida: 60, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Flatbread.png` },
+  { id: 11, nombre: 'Medio Cartón Huevos', categoria: 'Varios / Empaques', tipoVenta: 'unidad', precioKg: 2.80, stockGramos: 25, codigoBarras: '7591009', descuentoHoy: 15, diasVida: 15, fechaIngreso: hoyStr, img: `${FLUENT_3D_BASE}/Food/Egg.png` }
 ];
 
 let productos = JSON.parse(localStorage.getItem('bascula_productos')) || productosPredeterminados;
@@ -119,6 +122,41 @@ function escaparHTML(str) {
   return String(str).replace(/[&<>'"]/g, 
     tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
   );
+}
+
+// ==========================================================
+// 7. MOTOR DE ACTUALIZACIÓN RÁPIDA TASA DÓLAR BCV
+// ==========================================================
+async function obtenerTasaBCV() {
+  try {
+    // 1. Intenta con la API principal (DolarVzla)
+    const res = await fetch('https://rates.dolarvzla.com/bcv/current.json', { cache: 'no-store' });
+    const data = await res.json();
+    if (data && data.current && data.current.usd) {
+      return parseFloat(data.current.usd);
+    }
+  } catch (e) {}
+
+  try {
+    // 2. Si falla, usa el respaldo (DolarApi Oficial)
+    const res2 = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { cache: 'no-store' });
+    const data2 = await res2.json();
+    if (data2 && data2.promedio) {
+      return parseFloat(data2.promedio);
+    }
+  } catch (e) {}
+
+  return null;
+}
+
+async function sincronizarTasaBCV Ahora() {
+  const btn = document.getElementById('btn-sincronizar');
+  if (btn) btn.innerText = "Actualizando dólar BCV...";
+  const nuevaTasa = await obtenerTasaBCV();
+  if (nuevaTasa && !isNaN(nuevaTasa) && nuevaTasa > 0) {
+    guardarTasaEnStorage(nuevaTasa);
+  }
+  if (btn) btn.innerText = "Sincronizar Tasa BCV en Tiempo Real";
 }
 
 // ==========================================================
@@ -167,7 +205,15 @@ function inicializarBotonAtrasNativo() {
   window.addEventListener('popstate', () => {
     navegandoConBotonAtras = true;
 
-    // 1. Prioridad: Si hay algún modal abierto (Numpad, Carrito, Confirmar, Admin, etc.), cerrarlo
+    // Si el banner de instrucción de entrada está visible, quitarlo primero
+    const overlayInst = document.getElementById('overlay-instruccion-entrada');
+    if (overlayInst && overlayInst.style.display !== 'none') {
+      ocultarInstruccionEntrada();
+      navegandoConBotonAtras = false;
+      return;
+    }
+
+    // 1. Si hay algún modal abierto, cerrarlo
     const modalesAbiertos = Array.from(document.querySelectorAll('.modal.show'));
     if (modalesAbiertos.length > 0) {
       const ultimoModal = modalesAbiertos[modalesAbiertos.length - 1];
@@ -175,12 +221,12 @@ function inicializarBotonAtrasNativo() {
         unsubscribePagosVivo();
         unsubscribePagosVivo = null;
       }
-      cerrarModal(ultimoModal.id, true);
+      cerrarModal(ultimoModal.id);
       navegandoConBotonAtras = false;
       return;
     }
 
-    // 2. Si está dentro de una Categoría o buscando productos, volver a la vista de 6 Categorías
+    // 2. Si está dentro de una Categoría o búsqueda, volver a las 6 Categorías
     const vistaProductos = document.getElementById('vista-productos');
     if (vistaProductos && vistaProductos.style.display !== 'none') {
       mostrarCategorias(true);
@@ -192,8 +238,7 @@ function inicializarBotonAtrasNativo() {
     const pantallaKiosco = document.getElementById('pantalla-kiosco');
     if (pantallaKiosco && pantallaKiosco.style.display !== 'none') {
       if (window.carrito.length > 0) {
-        // Si tiene productos en el carrito, protegemos su compra para que no salga por accidente
-        mostrarToast("Tienes productos en el carrito. Usa el botón de salir al finalizar.", "aviso");
+        mostrarToast("Tienes productos en el carrito.", "aviso");
         try { window.history.pushState({ vista: 'categorias' }, ""); } catch (e) {}
       } else {
         reiniciarTodo(true);
@@ -203,6 +248,39 @@ function inicializarBotonAtrasNativo() {
     }
 
     navegandoConBotonAtras = false;
+  });
+}
+
+// ==========================================================
+// BANNER FLOTANTE DE INSTRUCCIÓN AL ENTRAR
+// ==========================================================
+function mostrarInstruccionEntrada() {
+  const overlay = document.getElementById('overlay-instruccion-entrada');
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  anime({
+    targets: '.instruccion-floating-card',
+    translateY: [-35, 0],
+    opacity: [0, 1],
+    scale: [0.92, 1],
+    duration: 420,
+    easing: 'easeOutBack(1.2)'
+  });
+}
+
+function ocultarInstruccionEntrada() {
+  const overlay = document.getElementById('overlay-instruccion-entrada');
+  if (!overlay || overlay.style.display === 'none') return;
+  anime({
+    targets: '.instruccion-floating-card',
+    translateY: [0, -25],
+    opacity: [1, 0],
+    scale: [1, 0.94],
+    duration: 220,
+    easing: 'easeInQuad',
+    complete: () => {
+      overlay.style.display = 'none';
+    }
   });
 }
 
@@ -243,7 +321,6 @@ function mostrarToast(mensaje, tipo = 'exito') {
   }, 3200);
 }
 
-// Precarga inteligente de imágenes 3D en segundo plano
 function precargarImagenes3D() {
   Object.values(iconosCategorias3D).forEach(url => {
     const img = new Image();
@@ -257,7 +334,6 @@ function precargarImagenes3D() {
   });
 }
 
-// Compresor de imágenes PNG sin fondo (Preserva transparencia canal Alpha)
 function comprimirImagenPNGTransparente(file, callback) {
   if (!file) return;
   const reader = new FileReader();
@@ -283,7 +359,6 @@ function comprimirImagenPNGTransparente(file, callback) {
   reader.readAsDataURL(file);
 }
 
-// Procesador de la imagen oficial del Código QR de tu celular
 function procesarSubidaQRBanco(file) {
   if (!file) return;
   const reader = new FileReader();
@@ -307,7 +382,7 @@ function procesarSubidaQRBanco(file) {
       localStorage.setItem('bascula_qr_custom_img', qrBancoImagenSrc);
       document.getElementById('adm-qr-url').value = '';
       actualizarVisorQRCarrito();
-      mostrarToast("Imagen de tu QR bancario guardada en alta definición", "exito");
+      mostrarToast("Imagen de tu QR bancario guardada", "exito");
     };
     img.src = e.target.result;
   };
@@ -329,7 +404,6 @@ function actualizarVisorQRCarrito() {
   }
 }
 
-// Generador nativo de Código de Barras Vectorial SVG para el Ticket
 function dibujarBarcodeSVGTicket(serialTexto) {
   const svg = document.getElementById('svg-ticket-barcode');
   if (!svg) return;
@@ -411,18 +485,53 @@ if ('serviceWorker' in navigator) {
 // INICIALIZACIÓN DE EVENTOS DOM
 // ==========================================================
 document.addEventListener('DOMContentLoaded', () => {
+  // Disparo inmediato de tasa BCV al abrir la app
+  sincronizarTasaBCVAhora();
+
   aplicarLogo();
   actualizarDisplaysTasa();
   actualizarDisplayPeso();
   cargarDatosPagoMovilUI();
   actualizarVisorQRCarrito();
   renderizarTarjetasCategorias3D();
+  renderizarOfertasSoloPorHoy();
   precargarImagenes3D();
-  obtenerTasaBCVOnline();
   iniciarMonitoreoInactividad();
   inicializarBotonAtrasNativo();
   actualizarReporteAdmin();
   document.getElementById('adm-fecha-ingreso').value = hoyStr;
+
+  // Cargar ajustes de Impresora y Papel en el Panel Admin
+  const selectPapel = document.getElementById('adm-papel-ancho');
+  const checkAutoPrint = document.getElementById('adm-auto-print');
+  if (selectPapel) {
+    selectPapel.value = anchoPapelMM;
+    selectPapel.addEventListener('change', (e) => {
+      anchoPapelMM = e.target.value;
+      localStorage.setItem('bascula_papel_ancho', anchoPapelMM);
+      mostrarToast(`Formato de papel fijado en ${anchoPapelMM}mm`, "exito");
+    });
+  }
+  if (checkAutoPrint) {
+    checkAutoPrint.checked = autoImprimirTicket;
+    checkAutoPrint.addEventListener('change', (e) => {
+      autoImprimirTicket = e.target.checked;
+      localStorage.setItem('bascula_auto_print', String(autoImprimirTicket));
+      mostrarToast(
+        autoImprimirTicket
+          ? "Impresión directa activada al finalizar"
+          : "Modo sin papel activo: mostrará el ticket para tomar foto",
+        "exito"
+      );
+    });
+  }
+
+  // Cerrar el banner flotante de instrucción al tocar cualquier parte
+  document.getElementById('overlay-instruccion-entrada').addEventListener('click', ocultarInstruccionEntrada);
+  document.getElementById('btn-cerrar-instruccion').addEventListener('click', (e) => {
+    e.stopPropagation();
+    ocultarInstruccionEntrada();
+  });
 
   anime({
     targets: '#img-logo-bienvenida',
@@ -444,6 +553,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-volver').addEventListener('click', () => mostrarCategorias(false));
   document.getElementById('btn-cart-float').addEventListener('click', abrirCarrito);
 
+  // Botón Eliminar Todo el Carrito
+  document.getElementById('btn-vaciar-carrito').addEventListener('click', vaciarTodoElCarrito);
+
   // Acceso Admin con Numpad Táctil
   document.getElementById('btn-acceso-admin').addEventListener('click', () => {
     abrirNumpad({
@@ -454,13 +566,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Hardware (BLE + USB Serial)
+  // Hardware dentro del Panel Admin (Balanza BLE, Balanza USB e Impresora Térmica)
   document.getElementById('btn-conectar-ble').addEventListener('click', conectarBLE);
   document.getElementById('btn-conectar-usb').addEventListener('click', conectarUSBSerial);
+  document.getElementById('btn-vincular-impresora-admin').addEventListener('click', vincularImpresoraBluetooth);
 
   // Configuración Admin y Subida de tu Imagen QR
-  document.getElementById('btn-actualizar-tasa-header').addEventListener('click', obtenerTasaBCVOnline);
-  document.getElementById('btn-sincronizar').addEventListener('click', obtenerTasaBCVOnline);
+  document.getElementById('btn-actualizar-tasa-header').addEventListener('click', sincronizarTasaBCVAhora);
+  document.getElementById('btn-sincronizar').addEventListener('click', sincronizarTasaBCVAhora);
   document.getElementById('btn-guardar-tasa').addEventListener('click', guardarTasaManual);
   document.getElementById('btn-guardar-pm').addEventListener('click', guardarDatosPagoMovil);
   
@@ -572,7 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-ticket-pendiente').addEventListener('click', () => generarTicket('PENDIENTE'));
 
   // Ticket y Exportaciones
-  document.getElementById('btn-imprimir-bt').addEventListener('click', imprimirTicketBluetooth);
+  document.getElementById('btn-imprimir-bt').addEventListener('click', () => imprimirTicketBluetooth(false));
   document.getElementById('btn-repetir-pesaje').addEventListener('click', repetirPesaje);
   document.getElementById('btn-finalizar-salir').addEventListener('click', () => reiniciarTodo(false));
   document.getElementById('btn-exportar-ventas').addEventListener('click', exportarVentasCSV);
@@ -642,7 +755,75 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-window.addEventListener('focus', () => obtenerTasaBCVOnline());
+window.addEventListener('focus', () => sincronizarTasaBCVAhora());
+
+// ==========================================================
+// 6. VITRINA "¡OFERTAS SOLO POR HOY!" EN PANTALLA PRINCIPAL
+// ==========================================================
+function calcularEstadoOferta(p) {
+  // Prioridad 1: Descuento directo asignado en "Oferta Solo por Hoy"
+  const descHoy = parseInt(p.descuentoHoy) || 0;
+  if (descHoy > 0 && descHoy <= 90) {
+    return {
+      descuento: descHoy,
+      etiqueta: `HOY -${descHoy}%`,
+      precioFinal: p.precioKg * (1 - descHoy / 100)
+    };
+  }
+
+  // Prioridad 2: Descuento automático por frescura del lote
+  if (!p.fechaIngreso || !p.diasVida) return { descuento: 0, etiqueta: '', precioFinal: p.precioKg };
+  const fIngreso = new Date(p.fechaIngreso);
+  const fHoy = new Date();
+  const diasTranscurridos = Math.floor(Math.abs(fHoy - fIngreso) / (1000 * 60 * 60 * 24));
+  const diasRestantes = p.diasVida - diasTranscurridos;
+
+  if (diasRestantes <= 0) return { descuento: 50, etiqueta: 'REMATE -50%', precioFinal: p.precioKg * 0.50 };
+  if (diasRestantes === 1) return { descuento: 20, etiqueta: 'OFERTA -20%', precioFinal: p.precioKg * 0.80 };
+  return { descuento: 0, etiqueta: '', precioFinal: p.precioKg };
+}
+
+function renderizarOfertasSoloPorHoy() {
+  const seccion = document.getElementById('seccion-ofertas-hoy');
+  const contenedor = document.getElementById('grid-ofertas-hoy');
+  if (!seccion || !contenedor) return;
+
+  contenedor.innerHTML = '';
+  const productosEnOferta = productos.filter(p => {
+    const est = calcularEstadoOferta(p);
+    return est.descuento > 0 && (p.stockGramos === undefined || p.stockGramos > 0);
+  });
+
+  if (productosEnOferta.length === 0) {
+    seccion.style.display = 'none';
+    return;
+  }
+
+  if (categoriaSeleccionada === "") {
+    seccion.style.display = 'block';
+  }
+
+  productosEnOferta.forEach(p => {
+    const esPorUnidad = p.tipoVenta === 'unidad' || p.categoria === 'Varios / Empaques';
+    const sufijo = esPorUnidad ? '/u' : '/kg';
+    const est = calcularEstadoOferta(p);
+    const precioBs = est.precioFinal * tasaBCV;
+
+    const card = document.createElement('div');
+    card.className = 'card-oferta-hoy';
+    card.innerHTML = `
+      <img src="${escaparHTML(p.img)}" alt="${escaparHTML(p.nombre)}" onerror="this.src='https://cdn-icons-png.flaticon.com/512/1046/1046857.png'">
+      <div class="oferta-hoy-info">
+        <span class="oferta-hoy-tag">${est.etiqueta}</span>
+        <h5>${escaparHTML(p.nombre)}</h5>
+        <div class="oferta-hoy-precio">$${est.precioFinal.toFixed(2)}${sufijo} <small class="precio-tachado">$${p.precioKg.toFixed(2)}</small></div>
+        <div class="oferta-hoy-bs">Bs. ${precioBs.toFixed(2)}${sufijo}</div>
+      </div>
+    `;
+    card.addEventListener('click', () => seleccionarProducto(p.id));
+    contenedor.appendChild(card);
+  });
+}
 
 // ==========================================================
 // RENDERIZADO VISUAL 3D DE CATEGORÍAS Y QUICK-TABS
@@ -690,45 +871,11 @@ function actualizarEstadoQuickPills() {
   });
 }
 
-// ==========================================================
-// SINCRONIZACIÓN TASA BCV Y CONFIGURACIÓN COMERCIO
-// ==========================================================
-async function obtenerTasaBCVOnline() {
-  const btn = document.getElementById('btn-sincronizar');
-  if (btn) btn.innerText = "Consultando tasa oficial en vivo...";
-  try {
-    const resPrimary = await fetch('https://rates.dolarvzla.com/bcv/current.json', { cache: 'no-cache' });
-    if (resPrimary.ok) {
-      const dataPrimary = await resPrimary.json();
-      let tasaActual = dataPrimary.rate || dataPrimary.price || dataPrimary.promedio;
-      if (tasaActual && !isNaN(tasaActual) && tasaActual > 0) {
-        guardarTasaEnStorage(parseFloat(tasaActual));
-        return;
-      }
-    }
-    throw new Error("Fallback");
-  } catch (err) {
-    try {
-      const response = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { cache: 'no-cache' });
-      if (response.ok) {
-        const data = await response.json();
-        let tasaAlMomento = data.promedio || data.precio;
-        if (tasaAlMomento && !isNaN(tasaAlMomento) && tasaAlMomento > 0) {
-          guardarTasaEnStorage(parseFloat(tasaAlMomento));
-        }
-      }
-    } catch (e) {
-      console.warn("Operando con tasa BCV local.");
-    }
-  } finally {
-    if (btn) btn.innerText = "Sincronizar Tasa BCV en Tiempo Real";
-  }
-}
-
 function guardarTasaEnStorage(valor) {
   tasaBCV = valor;
   localStorage.setItem('bascula_tasa_bcv', tasaBCV);
   actualizarDisplaysTasa();
+  renderizarOfertasSoloPorHoy();
   if (categoriaSeleccionada) renderizarProductosGrid(productos.filter(p => p.categoria === categoriaSeleccionada));
 }
 
@@ -884,14 +1031,16 @@ function iniciarKiosco() {
     targets: '#pantalla-inicio',
     opacity: [1, 0],
     scale: [1, 1.03],
-    duration: 320,
+    duration: 300,
     easing: 'easeInOutQuad',
     complete: () => {
       document.getElementById('pantalla-inicio').style.display = 'none';
       const kiosco = document.getElementById('pantalla-kiosco');
       kiosco.style.display = 'flex';
-      anime({ targets: kiosco, opacity: [0, 1], duration: 380, easing: 'easeOutQuad' });
+      anime({ targets: kiosco, opacity: [0, 1], duration: 360, easing: 'easeOutQuad' });
       mostrarCategorias(true);
+      // Mostrar notificación flotante de instrucción al entrar
+      mostrarInstruccionEntrada();
     }
   });
 }
@@ -909,6 +1058,7 @@ function mostrarCategorias(desdeHistorial = false) {
   document.getElementById('vista-productos').style.display = 'none';
 
   renderizarTarjetasCategorias3D();
+  renderizarOfertasSoloPorHoy();
 
   anime({
     targets: '.card-categoria',
@@ -921,6 +1071,7 @@ function mostrarCategorias(desdeHistorial = false) {
 }
 
 function filtrarPorCategoria(cat) {
+  ocultarInstruccionEntrada();
   if (categoriaSeleccionada !== cat) {
     empujarEstadoHistorial({ vista: 'productos', categoria: cat });
   }
@@ -928,6 +1079,7 @@ function filtrarPorCategoria(cat) {
   document.getElementById('input-buscar').value = "";
   document.getElementById('titulo-seccion').innerText = cat;
   document.getElementById('btn-volver').style.display = 'flex';
+  document.getElementById('seccion-ofertas-hoy').style.display = 'none';
   document.getElementById('barra-quick-cats').style.display = 'flex';
   document.getElementById('vista-categorias').style.display = 'none';
   document.getElementById('vista-productos').style.display = 'grid';
@@ -937,11 +1089,13 @@ function filtrarPorCategoria(cat) {
 }
 
 function buscarProductosDirecto() {
+  ocultarInstruccionEntrada();
   let texto = document.getElementById('input-buscar').value.toLowerCase().trim();
   if (texto.length > 0) {
     if (document.getElementById('vista-productos').style.display === 'none') {
       empujarEstadoHistorial({ vista: 'busqueda' });
     }
+    document.getElementById('seccion-ofertas-hoy').style.display = 'none';
     document.getElementById('vista-categorias').style.display = 'none';
     document.getElementById('barra-quick-cats').style.display = 'flex';
     document.getElementById('vista-productos').style.display = 'grid';
@@ -963,18 +1117,6 @@ function buscarProductosDirecto() {
   }
 }
 
-function calcularEstadoOferta(p) {
-  if (!p.fechaIngreso || !p.diasVida) return { descuento: 0, etiqueta: '', precioFinal: p.precioKg };
-  const fIngreso = new Date(p.fechaIngreso);
-  const fHoy = new Date();
-  const diasTranscurridos = Math.floor(Math.abs(fHoy - fIngreso) / (1000 * 60 * 60 * 24));
-  const diasRestantes = p.diasVida - diasTranscurridos;
-
-  if (diasRestantes <= 0) return { descuento: 50, etiqueta: 'REMATE -50%', precioFinal: p.precioKg * 0.50 };
-  if (diasRestantes === 1) return { descuento: 20, etiqueta: 'OFERTA -20%', precioFinal: p.precioKg * 0.80 };
-  return { descuento: 0, etiqueta: '', precioFinal: p.precioKg };
-}
-
 function renderizarProductosGrid(lista) {
   const grid = document.getElementById('vista-productos');
   grid.innerHTML = '';
@@ -990,7 +1132,7 @@ function renderizarProductosGrid(lista) {
     let precioEfectivo = estadoOferta.precioFinal;
     let precioBs = precioEfectivo * tasaBCV;
 
-    let badgeHtml = estadoOferta.descuento > 0 ? `<div class="${estadoOferta.descuento === 50 ? 'badge-remate' : 'badge-oferta'}">${estadoOferta.etiqueta}</div>` : '';
+    let badgeHtml = estadoOferta.descuento > 0 ? `<div class="${estadoOferta.descuento >= 40 ? 'badge-remate' : 'badge-oferta'}">${estadoOferta.etiqueta}</div>` : '';
     let barcodeHtml = p.codigoBarras ? `<div class="badge-barcode">#${escaparHTML(p.codigoBarras)}</div>` : '';
 
     let stockVal = p.stockGramos !== undefined ? p.stockGramos : 10000;
@@ -1036,6 +1178,7 @@ function renderizarProductosGrid(lista) {
 }
 
 function seleccionarProducto(id) {
+  ocultarInstruccionEntrada();
   productoTemp = productos.find(p => p.id === id);
   if (!productoTemp) return;
 
@@ -1167,8 +1310,20 @@ function actualizarCarritoBadge() {
 }
 
 // ==========================================================
-// CARRITO, QUEMADO COMPATIBLE CON JUNRIDE RULES Y ESCUCHA EN VIVO
+// 5. CARRITO, BOTÓN VACIAR TODO Y ESCUCHA EN VIVO
 // ==========================================================
+function vaciarTodoElCarrito() {
+  if (window.carrito.length === 0) {
+    mostrarToast("El carrito ya está vacío", "aviso");
+    return;
+  }
+  window.carrito = [];
+  reproducirSonido('beep');
+  actualizarCarritoBadge();
+  abrirCarrito();
+  mostrarToast("Se eliminaron todos los artículos del carrito", "aviso");
+}
+
 function cambiarMetodoPago(metodo) {
   metodoPagoActual = metodo;
   document.getElementById('tab-pagomovil').classList.toggle('active', metodo === 'pagomovil');
@@ -1192,13 +1347,17 @@ function recalcularTotalesCarritoUI() {
 }
 
 function abrirCarrito() {
+  ocultarInstruccionEntrada();
   const contenedor = document.getElementById('lista-carrito');
+  const btnVaciar = document.getElementById('btn-vaciar-carrito');
   contenedor.innerHTML = '';
   let pesoEsperadoTotal = 0;
 
   if (window.carrito.length === 0) {
+    if (btnVaciar) btnVaciar.style.display = 'none';
     contenedor.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:15px; font-weight:700;">El carrito está vacío</p>';
   } else {
+    if (btnVaciar) btnVaciar.style.display = 'inline-flex';
     window.carrito.forEach((item, index) => {
       pesoEsperadoTotal += item.peso || 0;
       const detalleCant = item.tipoVenta === 'unidad' ? `${item.unidades} unid.` : `${item.peso}g`;
@@ -1237,7 +1396,7 @@ function eliminarDelCarrito(index) {
   abrirCarrito();
 }
 
-// Función blindada para marcar el pago como usado cumpliendo las Reglas de Seguridad de tu Firestore
+// Quemado de pago compatible con tus reglas de Firestore (canjeado_en_junride == true)
 async function quemarPagoEnFirestore(docSnap) {
   const docId = docSnap.id;
   if (!referenciasQuemadasLocal.includes(docId)) {
@@ -1246,14 +1405,12 @@ async function quemarPagoEnFirestore(docSnap) {
   }
 
   try {
-    // Enviamos canjeado_en_junride: true porque tu regla en Firestore exige ese campo exacto para permitir update
     await updateDoc(docSnap.ref, {
       canjeado_en_junride: true,
       estado: "PROCESADO",
       fecha_procesado: new Date().toISOString()
     });
   } catch (errSdk) {
-    // Respaldo por API REST directa en caso de inestabilidad 4G
     try {
       const data = docSnap.data();
       const restUrl = `https://firestore.googleapis.com/v1/projects/geomercado-9d642/databases/(default)/documents/verificacion_pagos/${docId}?updateMask.fieldPaths=canjeado_en_junride&updateMask.fieldPaths=estado&updateMask.fieldPaths=monto&updateMask.fieldPaths=referencia_6digitos`;
@@ -1269,13 +1426,10 @@ async function quemarPagoEnFirestore(docSnap) {
           }
         })
       });
-    } catch (errRest) {
-      console.warn("Quemado registrado localmente.");
-    }
+    } catch (errRest) {}
   }
 }
 
-// Escucha Automática en Tiempo Real con Firestore onSnapshot
 function iniciarEscuchaPagosEnVivo() {
   if (unsubscribePagosVivo) {
     unsubscribePagosVivo();
@@ -1311,7 +1465,6 @@ function iniciarEscuchaPagosEnVivo() {
   }, () => {});
 }
 
-// Verificación Manual por 6 Dígitos de Referencia
 async function validarPagoFirestore() {
   const rawInput = document.getElementById('ref-pago-input').value.trim();
   const msgDiv = document.getElementById('msg-autopago');
@@ -1357,7 +1510,6 @@ async function validarPagoFirestore() {
           break;
         }
 
-        // Quemar pago cumpliendo la regla canjeado_en_junride == true
         await quemarPagoEnFirestore(docSnap);
 
         msgDiv.className = "msg-exito";
@@ -1367,7 +1519,7 @@ async function validarPagoFirestore() {
         setTimeout(() => {
           cerrarModal('modal-carrito');
           generarTicket('PAGADO');
-        }, 700);
+        }, 500);
         return;
       }
     } else {
@@ -1383,7 +1535,7 @@ async function validarPagoFirestore() {
 }
 
 // ==========================================================
-// EMISIÓN DE TICKET CON CÓDIGO DE BARRAS VECTORIAL SVG
+// 3 y 4. EMISIÓN DE TICKET AUTOMÁTICO + MODOS 58MM / 80MM / SIN ROLLO
 // ==========================================================
 function generarTicket(estadoPago = 'PENDIENTE') {
   if (window.carrito.length === 0) { mostrarToast("El carrito está vacío", "aviso"); return; }
@@ -1409,14 +1561,24 @@ function generarTicket(estadoPago = 'PENDIENTE') {
   const totalUsd = aplicaIGTF ? baseUsd * 1.03 : baseUsd;
   const totalBs = aplicaIGTF ? baseBs * 1.03 : baseBs;
 
-  datosUltimoTicket = { serial: numSerial, fecha: fechaHora, tasa: tasaBCV, estado: estadoPago, items: [...window.carrito], totalUsd, totalBs };
+  datosUltimoTicket = {
+    serial: numSerial,
+    fecha: fechaHora,
+    tasa: tasaBCV,
+    estado: estadoPago,
+    aplicaIGTF,
+    baseUsd,
+    items: [...window.carrito],
+    totalUsd,
+    totalBs
+  };
 
   let esPagado = estadoPago === 'PAGADO';
   let badgeEstadoText = esPagado ? "[ AUTOPAGO VERIFICADO - SALIDA AUTORIZADA ]" : "[ PENDIENTE DE PAGO - PASAR POR CAJA ]";
 
   let html = `
     <div style="text-align:center; margin-bottom:8px;">
-      <b>TERMINAL BÁSCULA POS PRO</b><br>
+      <b>BÁSCULA POS</b><br>
       <small>${fechaHora}</small><br>
       <b>SERIAL: ${numSerial}</b><br>
       <div style="margin: 6px 0; padding: 5px; border-radius: 6px; font-weight: 900; background: ${esPagado ? '#dcfce7; color: #15803d;' : '#fef3c7; color: #b45309;'}">
@@ -1461,14 +1623,132 @@ function generarTicket(estadoPago = 'PENDIENTE') {
   });
   localStorage.setItem('bascula_ventas_historial', JSON.stringify(ventasHistorial));
   actualizarReporteAdmin();
+  renderizarOfertasSoloPorHoy();
 
   window.carrito = [];
   actualizarCarritoBadge();
-  abrirModal('modal-ticket');
+
+  // Configurar textos según si está activo el modo de impresión automática o el modo sin rollo (foto)
+  const tituloModal = document.getElementById('titulo-modal-ticket');
+  const subModal = document.getElementById('subtitulo-modal-ticket');
+  const btnImprimirManual = document.getElementById('btn-imprimir-bt');
+
+  if (autoImprimirTicket) {
+    tituloModal.innerText = "¡Retire su Ticket Impreso!";
+    subModal.innerText = "Enviando comprobante directamente a la impresora térmica...";
+    btnImprimirManual.style.display = 'inline-flex';
+    abrirModal('modal-ticket');
+    // Dispara la impresión de una vez sin preguntar
+    imprimirTicketBluetooth(true);
+  } else {
+    // Modo Ahorro / Sin Rollo de Papel: Para que el cliente tome foto al ticket en pantalla
+    tituloModal.innerText = "📸 ¡Tome una Foto a su Ticket!";
+    subModal.innerText = "Modo sin papel activo: Capture una foto de este comprobante para su salida.";
+    btnImprimirManual.style.display = 'none';
+    abrirModal('modal-ticket');
+  }
+}
+
+// Formateador de texto térmico según el ancho del rollo (58mm = 32 col | 80mm = 48 col)
+function construirTextoTermico(ticket) {
+  const cols = anchoPapelMM === "80" ? 48 : 32;
+  const lineaIgual = "=".repeat(cols) + "\n";
+  const lineaGuion = "-".repeat(cols) + "\n";
+
+  const centrar = (txt) => {
+    if (txt.length >= cols) return txt.slice(0, cols) + "\n";
+    const pad = Math.floor((cols - txt.length) / 2);
+    return " ".repeat(pad) + txt + "\n";
+  };
+
+  let out = lineaIgual;
+  out += centrar("BASCULA POS");
+  out += lineaIgual;
+  out += `FECHA: ${ticket.fecha}\n`;
+  out += `SERIAL: ${ticket.serial}\n`;
+  out += `TASA BCV: ${ticket.tasa.toFixed(2)} Bs/$\n`;
+  out += `ESTADO: [ ${ticket.estado} ]\n`;
+  out += lineaGuion;
+
+  ticket.items.forEach(item => {
+    const cant = item.tipoVenta === 'unidad' ? `${item.unidades}u` : `${item.peso}g`;
+    out += `${item.nombre} (${cant})\n`;
+    out += `USD: $${item.subtotalUsd.toFixed(2)} | Bs. ${item.subtotalBs.toFixed(2)}\n`;
+  });
+
+  if (ticket.aplicaIGTF) {
+    out += `IGTF Divisas (3%): +$${(ticket.baseUsd * 0.03).toFixed(2)}\n`;
+  }
+
+  out += lineaGuion;
+  out += `TOTAL USD: $${ticket.totalUsd.toFixed(2)}\n`;
+  out += `TOTAL BS:  Bs. ${ticket.totalBs.toFixed(2)}\n`;
+  out += lineaIgual + "\n\n\n";
+  return out;
+}
+
+// Vincular impresora desde el Panel Admin para que quede lista para imprimir sin preguntar
+async function vincularImpresoraBluetooth() {
+  if (!navigator.bluetooth) {
+    mostrarToast("Web Bluetooth no soportado en este navegador", "error");
+    return false;
+  }
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '0000e025-0000-1000-8000-00805f9b34fb']
+    });
+    const server = await device.gatt.connect();
+    let service;
+    try { service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb'); }
+    catch (e) { service = await server.getPrimaryService('0000e025-0000-1000-8000-00805f9b34fb'); }
+
+    characteristicImpresoraActiva = (await service.getCharacteristics())[0];
+    nombreImpresoraActiva = device.name || "Térmica BT";
+
+    const lbl = document.getElementById('lbl-estado-impresora');
+    if (lbl) lbl.innerText = `Conectada: ${nombreImpresoraActiva}`;
+    mostrarToast(`Impresora "${nombreImpresoraActiva}" lista (${anchoPapelMM}mm)`, "exito");
+    return true;
+  } catch (err) {
+    mostrarToast("No se seleccionó impresora Bluetooth", "aviso");
+    return false;
+  }
+}
+
+async function imprimirTicketBluetooth(esAutomatico = false) {
+  if (!datosUltimoTicket) { mostrarToast("No hay ticket activo", "aviso"); return; }
+
+  try {
+    // Si ya vinculaste la impresora en el Panel Admin, imprime directo en 0.1s sin ventana emergente
+    if (!characteristicImpresoraActiva) {
+      const conectado = await vincularImpresoraBluetooth();
+      if (!conectado) return;
+    }
+
+    const textoFormateado = construirTextoTermico(datosUltimoTicket);
+    const bytes = (new TextEncoder()).encode(textoFormateado);
+
+    // Envío fragmentado seguro (chunks de 100 bytes) para soportar rollos largos sin saturar el buffer BLE
+    const CHUNK_SIZE = 100;
+    for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+      const chunk = bytes.slice(i, i + CHUNK_SIZE);
+      await characteristicImpresoraActiva.writeValue(chunk);
+    }
+
+    mostrarToast(`Ticket impreso (${anchoPapelMM}mm)`, "exito");
+  } catch (err) {
+    characteristicImpresoraActiva = null;
+    const lbl = document.getElementById('lbl-estado-impresora');
+    if (lbl) lbl.innerText = "Conectar Impresora";
+    if (!esAutomatico) {
+      mostrarToast("Reconectando impresora térmica...", "aviso");
+    }
+  }
 }
 
 // ==========================================================
-// CONEXIÓN HARDWARE DUAL: WEB BLUETOOTH BLE + WEB SERIAL USB
+// CONEXIÓN HARDWARE BALANZA (DESDE EL PANEL ADMIN)
 // ==========================================================
 async function conectarBLE() {
   if (!navigator.bluetooth) { mostrarToast("Web Bluetooth no disponible en este navegador", "error"); return; }
@@ -1519,39 +1799,11 @@ async function conectarUSBSerial() {
   }
 }
 
-async function imprimirTicketBluetooth() {
-  if (!datosUltimoTicket) { mostrarToast("No hay ticket activo", "aviso"); return; }
-  if (!navigator.bluetooth) { mostrarToast("Web Bluetooth no soportado", "error"); return; }
-
-  try {
-    const device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '0000e025-0000-1000-8000-00805f9b34fb']
-    });
-    const server = await device.gatt.connect();
-    let service;
-    try { service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb'); }
-    catch(e) { service = await server.getPrimaryService('0000e025-0000-1000-8000-00805f9b34fb'); }
-
-    const characteristic = (await service.getCharacteristics())[0];
-    let texto = `================================\n      BASCULA POS PRO      \n================================\nFECHA: ${datosUltimoTicket.fecha}\nSERIAL: ${datosUltimoTicket.serial}\nESTADO: [ ${datosUltimoTicket.estado} ]\n--------------------------------\n`;
-    datosUltimoTicket.items.forEach(item => {
-      const cant = item.tipoVenta === 'unidad' ? `${item.unidades}u` : `${item.peso}g`;
-      texto += `${item.nombre} (${cant})\nUSD: $${item.subtotalUsd.toFixed(2)} | Bs. ${item.subtotalBs.toFixed(2)}\n--------------------------------\n`;
-    });
-    texto += `TOTAL USD: $${datosUltimoTicket.totalUsd.toFixed(2)}\nTOTAL BS:  Bs. ${datosUltimoTicket.totalBs.toFixed(2)}\n================================\n\n\n`;
-
-    await characteristic.writeValue((new TextEncoder()).encode(texto));
-    mostrarToast("Impresión enviada a la térmica", "exito");
-  } catch (err) {
-    mostrarToast("No se encontró impresora térmica", "error");
-  }
-}
-
 function repetirPesaje() { cerrarModal('modal-ticket'); }
 
 function reiniciarTodo(desdeHistorial = false) {
   if (unsubscribePagosVivo) { unsubscribePagosVivo(); unsubscribePagosVivo = null; }
+  ocultarInstruccionEntrada();
   window.carrito = []; taraGramos = 0; datosUltimoTicket = null;
   actualizarCarritoBadge();
   document.querySelectorAll('.modal').forEach(m => {
@@ -1614,6 +1866,7 @@ function guardarProductoAdmin() {
   const precio = parseFloat(document.getElementById('adm-precio').value);
   const stockGramos = parseInt(document.getElementById('adm-stock').value) || 0;
   const codigoBarras = document.getElementById('adm-codigo-barras').value.trim();
+  const descuentoHoy = parseInt(document.getElementById('adm-descuento-hoy').value) || 0;
   const diasVida = parseInt(document.getElementById('adm-dias-vida').value) || 5;
   const fechaIngreso = document.getElementById('adm-fecha-ingreso').value || hoyStr;
   const imgUrlInput = document.getElementById('adm-img-url').value.trim();
@@ -1624,18 +1877,20 @@ function guardarProductoAdmin() {
   }
 
   const imgFinal = imagenesBase64Temp.add || imgUrlInput || iconosCategorias3D[categoria] || 'https://cdn-icons-png.flaticon.com/512/1046/1046857.png';
-  productos.push({ id: Date.now(), nombre, categoria, tipoVenta, precioKg: precio, stockGramos, codigoBarras, diasVida, fechaIngreso, img: imgFinal });
+  productos.push({ id: Date.now(), nombre, categoria, tipoVenta, precioKg: precio, stockGramos, codigoBarras, descuentoHoy, diasVida, fechaIngreso, img: imgFinal });
   localStorage.setItem('bascula_productos', JSON.stringify(productos));
 
   document.getElementById('adm-nombre').value = '';
   document.getElementById('adm-precio').value = '';
   document.getElementById('adm-codigo-barras').value = '';
+  document.getElementById('adm-descuento-hoy').value = '0';
   document.getElementById('adm-img-url').value = '';
   document.getElementById('prev-add-box').style.display = 'none';
   imagenesBase64Temp.add = null;
 
   renderizarListaAdmin();
   renderizarTarjetasCategorias3D();
+  renderizarOfertasSoloPorHoy();
   renderizarGraficoD3();
   if (categoriaSeleccionada) filtrarPorCategoria(categoriaSeleccionada);
   mostrarToast("Producto 3D guardado en catálogo", "exito");
@@ -1649,6 +1904,7 @@ function renderizarListaAdmin() {
   productos.forEach(p => {
     const esUnidad = p.tipoVenta === 'unidad' || p.categoria === 'Varios / Empaques';
     const stockTxt = esUnidad ? `${p.stockGramos || 0} unid.` : `${((p.stockGramos || 0) / 1000).toFixed(1)}kg`;
+    const descTxt = p.descuentoHoy > 0 ? ` | 🔥 Oferta -${p.descuentoHoy}%` : '';
     const item = document.createElement('div');
     item.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#070c14; padding:8px 12px; border-radius:10px; border:1px solid var(--border-glass);";
     item.innerHTML = `
@@ -1656,7 +1912,7 @@ function renderizarListaAdmin() {
         <img src="${escaparHTML(p.img)}" style="width:38px; height:38px; object-fit:contain;">
         <div>
           <b style="font-size:0.88rem;">${escaparHTML(p.nombre)}</b>
-          <div style="font-size:0.75rem; color:var(--text-muted);">$${p.precioKg.toFixed(2)} (${esUnidad ? 'Unidad' : 'Kg'}) | ${escaparHTML(p.categoria)} | Stock: ${stockTxt}</div>
+          <div style="font-size:0.75rem; color:var(--text-muted);">$${p.precioKg.toFixed(2)} (${esUnidad ? 'Unidad' : 'Kg'}) | ${escaparHTML(p.categoria)} | Stock: ${stockTxt}${descTxt}</div>
         </div>
       </div>
       <div style="display:flex; gap:6px;">
@@ -1682,6 +1938,7 @@ function abrirModalEditar(id) {
   document.getElementById('edit-prod-tipo').value = p.tipoVenta || (p.categoria === 'Varios / Empaques' ? 'unidad' : 'peso');
   document.getElementById('edit-prod-stock').value = p.stockGramos !== undefined ? p.stockGramos : 10000;
   document.getElementById('edit-prod-codigo').value = p.codigoBarras || '';
+  document.getElementById('edit-prod-descuento-hoy').value = p.descuentoHoy || 0;
   document.getElementById('edit-prod-dias').value = p.diasVida || 5;
   document.getElementById('edit-prod-fecha').value = p.fechaIngreso || hoyStr;
   document.getElementById('edit-prod-img-url').value = p.img.startsWith('data:') ? '' : p.img;
@@ -1701,6 +1958,7 @@ function guardarCambiosEdicion() {
   productos[idx].tipoVenta = document.getElementById('edit-prod-tipo').value;
   productos[idx].stockGramos = parseInt(document.getElementById('edit-prod-stock').value) || 0;
   productos[idx].codigoBarras = document.getElementById('edit-prod-codigo').value.trim();
+  productos[idx].descuentoHoy = parseInt(document.getElementById('edit-prod-descuento-hoy').value) || 0;
   productos[idx].diasVida = parseInt(document.getElementById('edit-prod-dias').value) || 5;
   productos[idx].fechaIngreso = document.getElementById('edit-prod-fecha').value || hoyStr;
   
@@ -1712,6 +1970,7 @@ function guardarCambiosEdicion() {
   cerrarModal('modal-editar-producto');
   renderizarListaAdmin();
   renderizarTarjetasCategorias3D();
+  renderizarOfertasSoloPorHoy();
   renderizarGraficoD3();
   if (categoriaSeleccionada) filtrarPorCategoria(categoriaSeleccionada);
   mostrarToast("Cambios guardados", "exito");
@@ -1722,6 +1981,7 @@ function eliminarProductoAdmin(id) {
   localStorage.setItem('bascula_productos', JSON.stringify(productos));
   renderizarListaAdmin();
   renderizarTarjetasCategorias3D();
+  renderizarOfertasSoloPorHoy();
   renderizarGraficoD3();
   if (categoriaSeleccionada) filtrarPorCategoria(categoriaSeleccionada);
   mostrarToast("Producto eliminado", "aviso");
@@ -1810,9 +2070,9 @@ function exportarVentasCSV() {
 }
 
 function exportarProductosCSV() {
-  let csv = "data:text/csv;charset=utf-8,ID,Nombre,Categoria,ModoVenta,PrecioUSD,Stock,CodigoBarras\n";
+  let csv = "data:text/csv;charset=utf-8,ID,Nombre,Categoria,ModoVenta,PrecioUSD,Stock,DescuentoHoy,CodigoBarras\n";
   productos.forEach(p => {
-    csv += `${p.id},"${p.nombre}",${p.categoria},${p.tipoVenta || 'peso'},${p.precioKg},${p.stockGramos || 0},${p.codigoBarras || ''}\n`;
+    csv += `${p.id},"${p.nombre}",${p.categoria},${p.tipoVenta || 'peso'},${p.precioKg},${p.stockGramos || 0},${p.descuentoHoy || 0},${p.codigoBarras || ''}\n`;
   });
   descargarCSV(csv, `Inventario_POS.csv`);
 }
